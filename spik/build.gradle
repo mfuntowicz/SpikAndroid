@@ -57,6 +57,6 @@ dependencies {
 
     compile 'io.netty:netty-all:4.1.0.Beta7'
 
-    //compile group:"com.funtowiczmo", name:"spik-sms-lan", version:"1.0-SNAPSHOT", changing:true
+    compile group:"com.funtowiczmo", name:"spik-sms-lan", version:"1.0-SNAPSHOT", changing:true
     compile group:"com.funtowiczmo", name:"spik-lang", version:"1.0-SNAPSHOT", changing:true
 }
