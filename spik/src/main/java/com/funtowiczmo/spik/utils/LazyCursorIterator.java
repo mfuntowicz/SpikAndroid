@@ -40,6 +40,9 @@ public abstract class LazyCursorIterator<T> implements Iterator<T>, AutoCloseabl
         if(cursor.isAfterLast())
             throw new IllegalStateException("Cursor has no more entity");
 
+        if(cursor.isBeforeFirst())
+            throw new IllegalStateException("Cursor is before the first row, you might be missing to call hasNext()");
+
         return handleEntity(wrapper);
     }
 
