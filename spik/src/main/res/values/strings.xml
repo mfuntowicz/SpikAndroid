@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Spik</string>
+    <string name="connect_lan">Connect on Wifi</string>
+    <string name="connection_error">A problem occured while connecting to computer</string>
+    <string name="no_remote_computer_found">No computer found to connect on</string>
+    <string name="no_lan_adapter">No WiFi adapter found</string>
+    <string name="ask_for_enable_lan">Please turn on the WiFi</string>
+    <string name="action_settings">Settings</string>
+</resources>
