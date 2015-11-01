@@ -7,4 +7,7 @@
     <string name="no_lan_adapter">No WiFi adapter found</string>
     <string name="ask_for_enable_lan">Please turn on the WiFi</string>
     <string name="action_settings">Settings</string>
+    <string name="searching_hosts">Looking for hosts</string>
+    <string name="please_wait">It will be fast !</string>
+    <string name="hosts_found">Host(s) found</string>
 </resources>
