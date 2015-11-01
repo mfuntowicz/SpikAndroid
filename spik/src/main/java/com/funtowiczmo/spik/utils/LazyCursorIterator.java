@@ -44,7 +44,7 @@ public abstract class LazyCursorIterator<T> implements Iterator<T>, AutoCloseabl
     }
 
     public void reset(){
-        cursor.moveToFirst();
+        cursor.moveToPosition(-1);
     }
 
     @Override
