@@ -6,6 +6,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
+import android.support.annotation.Nullable;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.repositories.ContactRepository;
 import com.funtowiczmo.spik.utils.LazyCursorIterator;
@@ -168,6 +169,7 @@ public class DefaultContactRepository implements ContactRepository {
      * @param contactId
      * @return Null if no photo, byte[] otherwise
      */
+    @Nullable
     private byte[] getPhoto(long contactId){
         Uri contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId);
 
