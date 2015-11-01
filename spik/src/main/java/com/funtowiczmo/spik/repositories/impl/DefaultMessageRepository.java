@@ -6,7 +6,6 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
-import android.provider.Telephony;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.lang.Conversation;
 import com.funtowiczmo.spik.lang.Message;
@@ -28,14 +27,6 @@ public class DefaultMessageRepository implements MessageRepository {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageRepository.class);
 
-    /** Threads Constants **/
-    private static final String[] THREADS_PROJECTION = new String[]{
-        Sms.ADDRESS,
-    };
-
-    private static final int THREADS_RECIPIENT_IDX = 0;
-
-
     /** SMS Contants **/
     private static final String[] SMS_PROJECTION = new String[]{
         Sms.DATE,
@@ -51,7 +42,6 @@ public class DefaultMessageRepository implements MessageRepository {
 
 
     /** MMS Constants **/
-    private static final Uri MMS_PART_URI = Uri.parse("content://mms/part");
     private static final String MMS_ADDR_URI_BASE = "content://mms/{id}/addr";
 
     private static final String[] MMS_PROJECTION = new String[]{
@@ -65,6 +55,7 @@ public class DefaultMessageRepository implements MessageRepository {
     private static final int MMS_TID_IDX = 2;
 
     /** MMS Part Constants **/
+    private static final Uri MMS_PART_URI = Uri.parse("content://mms/part");
     private static final String[] MMS_PART_PROJECTION = new String[]{
         Mms.Part.CONTENT_TYPE,
         Mms.Part.CT_TYPE,
@@ -89,74 +80,35 @@ public class DefaultMessageRepository implements MessageRepository {
     public LazyCursorIterator<Conversation> getConversations() {
         LOGGER.info("Trying to get all conversations");
 
-        final String[] PROJECTION = new String[]{ "DISTINCT " + Mms.THREAD_ID, Sms.ADDRESS, Mms._ID };
+        final String[] PROJECTION = new String[]{ Mms.THREAD_ID, Sms.ADDRESS, Mms._ID };
 
-        try(Cursor c = repository.query(MmsSms.CONTENT_CONVERSATIONS_URI, null, null, null, null)){
-            if(c != null) {
-                if(c.moveToFirst()) {
-                    do {
-                        long t_id = c.getLong(c.getColumnIndex(Mms.THREAD_ID));
-                        String recipients = c.getString(c.getColumnIndex(Sms.ADDRESS));
-
-                        if(recipients == null){
-                            final String m_id = String.valueOf(c.getLong(c.getColumnIndex(Mms._ID)));
-                            final Uri MMS_ADDR_URI = Uri.parse(MMS_ADDR_URI_BASE.replace("{id}", m_id));
-                            try(Cursor c2 = repository.query(MMS_ADDR_URI, new String[]{Mms.Addr.ADDRESS, Mms.Addr.CONTACT_ID}, null, null, null)){
-                                if(c2 != null){
-                                    if(c2.moveToFirst()){
-                                        recipients = c2.getString(c2.getColumnIndex(Mms.Addr.ADDRESS));
-                                    }
-                                }
-                            }
-                        }
-
-                        LOGGER.info("Thread {} with {}", t_id, recipients);
-                    }while (c.moveToNext());
-                }
-            }
-        }
-        return null;
-        //return new ConversationIterator(c, true);
+        Cursor c = repository.query(MmsSms.CONTENT_CONVERSATIONS_URI, null, null, null, null);
+        return new ConversationIterator(c, true);
     }
 
     @Override
-    public Conversation getConversationById(long id) {
-        LOGGER.info("Getting Conversation {}", id);
+    public Conversation getConversationById(long threadId) {
+        LOGGER.info("Getting Conversation {}", threadId);
 
-        final Uri THREADS_URI = ContentUris.withAppendedId(MmsSms.CONTENT_CONVERSATIONS_URI, id);
-        final Uri SMS_URI = ContentUris.withAppendedId(Sms.Conversations.CONTENT_URI, id);
+        final List<Contact> contacts = getParticipants(threadId);
+        final List<Message> sms = getSMSForThread(threadId);
+        final List<Message> mms = getMMSForThread(threadId);
 
-        List<Message> messages = null;
-        List<Contact> contacts = null;
+        final List<Message> messages = new ArrayList<>((sms != null ? sms.size() : 0) + (mms != null ? mms.size() : 0));
+        if(sms != null)
+            messages.addAll(sms);
 
-        //Recipients of the conversation
-        try(Cursor c = repository.query(THREADS_URI, THREADS_PROJECTION, null, null, null)){
-            if(c != null){
-                if(c.moveToFirst()){
-                    final String recipients = c.getString(THREADS_RECIPIENT_IDX);
-                    contacts = contactRepository.getContactsByPhone(recipients);
-                }
-            }
-        }
+        if(mms != null)
+            messages.addAll(mms);
 
-        //SMS of the conversation
-        try(Cursor c = repository.query(SMS_URI, SMS_PROJECTION, null, null, null)){
-            if(c != null){
-                if(c.moveToFirst()){
-                    messages = new ArrayList<>(c.getCount());
 
-                    do{
-                        messages.add(new Message(
-                                c.getLong(SMS_DATE_IDX),
-                                c.getString(SMS_BODY_IDX),
-                                c.getInt(SMS_READ_IDX) == 1,
-                                getMessageState(c.getInt(SMS_TYPE_IDX))
-                        ));
-                    }while (c.moveToNext());
-                }
-            }
-        }
+        if(LOGGER.isDebugEnabled())
+            LOGGER.debug("Retrieved {} messages for conversation {}", messages.size(), threadId);
 
+        return new Conversation(threadId, contacts, messages);
+    }
+
+    private List<Message> getMMSForThread(long threadId) {
         //MMS of the conversation
         /*try(Cursor c = repository.query(Mms.CONTENT_URI, MMS_PROJECTION, null, null, null)){
             if(c != null){
@@ -184,11 +136,94 @@ public class DefaultMessageRepository implements MessageRepository {
                 }
             }
         }*/
-
-        return new Conversation(id, contacts, messages);
+        return null;
     }
 
-    private Message.State getMessageState(int state) {
+
+    private List<Message> getSMSForThread(long threadId){
+        LOGGER.info("Getting all messages for conversation {}", threadId);
+        final Uri SMS_URI = ContentUris.withAppendedId(Sms.Conversations.CONTENT_URI, threadId);
+
+        List<Message> messages = null;
+
+        //SMS of the conversation
+        try(Cursor c = repository.query(SMS_URI, SMS_PROJECTION, null, null, null)){
+            if(c != null){
+                if(c.moveToFirst()){
+                    if(LOGGER.isDebugEnabled())
+                        LOGGER.debug("Cursor#getCount() = {}", c.getCount());
+
+                    messages = new ArrayList<>(c.getCount());
+
+                    do{
+                        messages.add(new Message(
+                                c.getLong(SMS_DATE_IDX),
+                                c.getString(SMS_BODY_IDX),
+                                c.getInt(SMS_READ_IDX) == 1,
+                                getMessageState(c.getInt(SMS_TYPE_IDX))
+                        ));
+                    }while (c.moveToNext());
+                }else{
+                    LOGGER.warn("Unable to move to the first row, might have 0 message in the conversation  (Cursor#getCount() = {})", c.getCount());
+                }
+            }else{
+                LOGGER.warn("Cursor is null");
+            }
+        }
+
+        return messages;
+    }
+
+    /**
+     * Query the provider for the participants in the thread
+     * @param threadId Id of thread we want to get the participants
+     * @return Null if thread not found.
+     */
+    private List<Contact> getParticipants(long threadId){
+        LOGGER.info("Getting participants in the conversation {}", threadId);
+
+        final Uri THREAD_URI = ContentUris.withAppendedId(MmsSms.CONTENT_CONVERSATIONS_URI, threadId);
+        String recipients = null;
+
+        try(Cursor c = repository.query(THREAD_URI, new String[]{Mms._ID, Sms.ADDRESS}, null, null, null)) {
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    recipients = c.getString(c.getColumnIndex(Sms.ADDRESS));
+
+                    if (recipients == null) {
+                        LOGGER.debug("Sms.ADDRESS is null, might be a MMS");
+
+                        final String m_id = String.valueOf(c.getLong(c.getColumnIndex(Mms._ID)));
+                        final Uri MMS_ADDR_URI = Uri.parse(MMS_ADDR_URI_BASE.replace("{id}", m_id));
+                        try (Cursor c2 = repository.query(MMS_ADDR_URI, new String[]{Mms.Addr.ADDRESS, Mms.Addr.CONTACT_ID}, null, null, null)) {
+                            if (c2 != null) {
+                                if (c2.moveToFirst()) {
+                                    recipients = c2.getString(c2.getColumnIndex(Mms.Addr.ADDRESS));
+                                }else{
+                                    LOGGER.warn("Unable to move to the first row of the cursor to retrieve MMS Address");
+                                }
+                            }else{
+                                LOGGER.warn("Cursor is null to retrieve MMS Address");
+                            }
+                        }
+                    }
+                }else{
+                    LOGGER.warn("Unable to move to the first row of the cursor");
+                }
+            }else{
+                LOGGER.warn("Cursor is null");
+            }
+        }
+
+        return recipients == null ? null : contactRepository.getContactsByPhone(recipients);
+    }
+
+    /**
+     * Convert internal Android messages state to Spik one
+     * @param state Android state
+     * @return
+     */
+    private static Message.State getMessageState(int state) {
         switch (state){
             case Sms.MESSAGE_TYPE_DRAFT:
                 return Message.State.DRAFT;
@@ -209,13 +244,14 @@ public class DefaultMessageRepository implements MessageRepository {
 
     private class ConversationIterator extends LazyCursorIterator<Conversation> {
 
-        protected ConversationIterator(Cursor cursor, boolean reset) {
+        private ConversationIterator(Cursor cursor, boolean reset) {
             super(cursor, reset);
         }
 
         @Override
         protected Conversation handleEntity(Cursor cursor) {
-            return getConversationById(cursor.getLong(0));
+            final long t_id = cursor.getLong(cursor.getColumnIndex(Mms.THREAD_ID));
+            return getConversationById(t_id);
         }
     }
 }
