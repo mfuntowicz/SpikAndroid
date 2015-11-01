@@ -116,7 +116,11 @@ public class DefaultContactRepository implements ContactRepository {
             if(c != null){
                 if(c.moveToFirst()){
                     return parseContact(c);
+                }else{
+                    LOGGER.warn("Unable to move to the first row");
                 }
+            }else{
+                LOGGER.warn("Cursor is null");
             }
         }
 
@@ -165,7 +169,6 @@ public class DefaultContactRepository implements ContactRepository {
      * @return Null if no photo, byte[] otherwise
      */
     private byte[] getPhoto(long contactId){
-
         Uri contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId);
 
         try(InputStream in = ContactsContract.Contacts.openContactPhotoInputStream(repository, contactUri)){
