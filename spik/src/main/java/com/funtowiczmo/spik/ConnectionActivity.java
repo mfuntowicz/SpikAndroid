@@ -3,6 +3,7 @@ package com.funtowiczmo.spik;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -13,6 +14,7 @@ import android.view.View;
 import com.funtowiczmo.spik.lan.discovery.LanDiscoveryClient;
 import com.funtowiczmo.spik.lang.Computer;
 import com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl;
+import com.funtowiczmo.spik.service.LanSpikService;
 import com.funtowiczmo.spik.ui.ComputerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,9 @@ public class ConnectionActivity extends AppCompatActivity {
 
     private ProgressDialog progressDialog;
 
+    /** Service reference **/
+    Intent serviceIntent = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -38,8 +43,13 @@ public class ConnectionActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onDestroy(){
+        super.onDestroy();
+
+        if(serviceIntent != null) {
+            stopService(serviceIntent);
+            serviceIntent = null;
+        }
     }
 
 
@@ -100,8 +110,19 @@ public class ConnectionActivity extends AppCompatActivity {
                                     @Override
                                     public void onClick(DialogInterface dialogInterface, int i) {
                                         final Computer computer = computers.get(i);
+                                        final Intent intent = new Intent(ConnectionActivity.this, LanSpikService.class);
+
+                                        intent.putExtra(LanSpikService.COMPUTER_NAME_EXTRA, computer.name());
+                                        intent.putExtra(LanSpikService.COMPUTER_OS_EXTRA, computer.os());
+                                        intent.putExtra(LanSpikService.COMPUTER_IP_EXTRA, computer.ip());
+                                        intent.putExtra(LanSpikService.COMPUTER_PORT_EXTRA, computer.port());
 
                                         LOGGER.info("Selected computer {}", computer);
+
+                                        if(serviceIntent == null)
+                                            serviceIntent = intent;
+
+                                        startService(serviceIntent);
                                     }
                                 }).setTitle(R.string.hosts_found);
                             }else{
@@ -132,8 +153,4 @@ public class ConnectionActivity extends AppCompatActivity {
             }
         }).start();
     }
-
-
-
-
 }
