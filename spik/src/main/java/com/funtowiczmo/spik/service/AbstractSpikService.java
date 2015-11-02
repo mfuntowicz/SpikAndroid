@@ -1,9 +1,6 @@
 package com.funtowiczmo.spik.service;
 
-import android.app.IntentService;
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
+import android.app.*;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
@@ -16,7 +13,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by momo- on 27/10/2015.
  */
-public abstract class AbstractSpikService extends IntentService {
+public abstract class AbstractSpikService extends Service {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractSpikService.class);
 
@@ -30,9 +27,7 @@ public abstract class AbstractSpikService extends IntentService {
     /** Spik resouces **/
     private Computer computer;
 
-    protected AbstractSpikService(String name) {
-        super(name);
-    }
+    protected AbstractSpikService() {}
 
     @Override
     public IBinder onBind(Intent intent) {
