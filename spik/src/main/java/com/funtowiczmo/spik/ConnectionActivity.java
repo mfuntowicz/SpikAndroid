@@ -92,16 +92,22 @@ public class ConnectionActivity extends AppCompatActivity {
 
                         if (computers != null) {
 
-                            AlertDialog.Builder dialog = new AlertDialog.Builder(ConnectionActivity.this)
-                                    .setAdapter(new ComputerAdapter(ConnectionActivity.this, computers), new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialogInterface, int i) {
-                                            final Computer computer = computers.get(i);
+                            AlertDialog.Builder dialog = new AlertDialog.Builder(ConnectionActivity.this);
 
-                                            LOGGER.info("Selected computer {}", computer);
-                                        }
-                                    })
-                                    .setTitle(R.string.hosts_found);
+                            if(computers.size() > 0) {
+                                LOGGER.info("{} Hosts found", computers.size());
+                                dialog.setAdapter(new ComputerAdapter(ConnectionActivity.this, computers), new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                        final Computer computer = computers.get(i);
+
+                                        LOGGER.info("Selected computer {}", computer);
+                                    }
+                                }).setTitle(R.string.hosts_found);
+                            }else{
+                                LOGGER.info("No host found");
+                                dialog.setTitle(R.string.no_host_found).setMessage(R.string.no_host_help);
+                            }
 
                             progressDialog.dismiss();
                             dialog.show();

@@ -10,4 +10,6 @@
     <string name="searching_hosts">Looking for hosts</string>
     <string name="please_wait">It will be fast !</string>
     <string name="hosts_found">Host(s) found</string>
+    <string name="no_host_found">No host found :(</string>
+    <string name="no_host_help">Check you are connected to the same network than your computer</string>
 </resources>
