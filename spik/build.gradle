@@ -55,8 +55,9 @@ dependencies {
     compile 'org.slf4j:slf4j-api:1.7.12'
     compile 'org.slf4j:slf4j-android:1.7.12'
 
-    compile 'io.netty:netty-all:4.1.0.Beta7'
+    compile 'com.jakewharton:butterknife:7.0.1'
 
     compile group:"com.funtowiczmo", name:"spik-sms-lan", version:"1.0-SNAPSHOT", changing:true
+    compile group:"com.funtowiczmo", name:"spik-sms-transport", version:"1.0-SNAPSHOT", changing:true
     compile group:"com.funtowiczmo", name:"spik-lang", version:"1.0-SNAPSHOT", changing:true
 }
