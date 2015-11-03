@@ -4,7 +4,6 @@ import android.content.Intent;
 import com.funtowicz.spik.sms.transport.listeners.SpikClientListener;
 import com.funtowiczmo.spik.lan.LanSpikClient;
 import com.funtowiczmo.spik.lang.Computer;
-import com.funtowiczmo.spik.utils.CurrentPhone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,7 @@ public class LanSpikService extends AbstractSpikService  {
             @Override
             public void onConnected(Computer computer) {
                 LOGGER.info("Connected to computer {}", computer);
-                launchSpik(computer);
+                launchSpik(computer, client);
             }
 
             @Override
@@ -70,9 +69,9 @@ public class LanSpikService extends AbstractSpikService  {
             }else{
                 try {
                     client.connect(remote);
-                    client.sendHello(CurrentPhone.CURRENT_PHONE);
                 } catch (InterruptedException e) {
                     LOGGER.warn("Unable to connect to {}:{} -> {}", ip, port, e.getMessage());
+                    stopSelf();
                 }
             }
         }

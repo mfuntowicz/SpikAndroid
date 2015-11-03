@@ -7,10 +7,15 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
+import com.funtowicz.spik.sms.transport.SpikClient;
 import com.funtowiczmo.spik.ConnectionActivity;
 import com.funtowiczmo.spik.R;
 import com.funtowiczmo.spik.context.SpikContext;
 import com.funtowiczmo.spik.lang.Computer;
+import com.funtowiczmo.spik.lang.Contact;
+import com.funtowiczmo.spik.lang.Conversation;
+import com.funtowiczmo.spik.utils.CurrentPhone;
+import com.funtowiczmo.spik.utils.LazyCursorIterator;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +42,7 @@ public abstract class AbstractSpikService extends RoboService {
     private final AtomicBoolean isInForeground = new AtomicBoolean(false);
 
     private SpikContext spikContext;
+    private SpikClient spikClient;
 
     @Override
     public void onCreate() {
@@ -82,7 +88,7 @@ public abstract class AbstractSpikService extends RoboService {
         notificationManager.notify(DISCONNECTED_NOTIFICATION_ID, notification);
     }
 
-    protected void launchSpik(Computer computer){
+    protected void launchSpik(Computer computer, SpikClient client){
         LOGGER.info("Starting Spik Service");
 
         if(isInForeground.compareAndSet(false, true)) {
@@ -100,14 +106,35 @@ public abstract class AbstractSpikService extends RoboService {
 
             notification.flags = Notification.FLAG_NO_CLEAR;
             startForeground(CONNECTED_NOTIFICATION_ID, notification);
+
+            spikClient = client;
+
+            client.sendHello(CurrentPhone.CURRENT_PHONE);
+            sendConversations();
         }
     }
 
     protected void stopSpik(){
         LOGGER.info("Stopping Spik Service");
         if(isInForeground.compareAndSet(true, false)){
+            spikClient = null;
             stopForeground(true);
             stopSelf();
+        }
+    }
+
+    private void sendConversations() {
+        try(LazyCursorIterator<Conversation> it = spikContext.messageRepository().getConversations()){
+            while (it.hasNext()){
+                final Conversation c = it.next();
+                for (Contact contact : c.participants()) {
+                    spikClient.sendContact(contact);
+                }
+
+                spikClient.sendConversation(c);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
