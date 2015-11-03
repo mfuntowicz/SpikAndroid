@@ -1,0 +1,20 @@
+<configuration>
+    <!-- Create a file appender for a log in the application's data directory -->
+    <appender name="console" class="ch.qos.logback.classic.android.LogcatAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="async" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+        <appender-ref ref="console" />
+    </appender>
+
+    <!-- Write INFO (and higher-level) messages to the log file -->
+    <root level="ALL">
+        <appender-ref ref="console" />
+    </root>
+</configuration>

@@ -54,7 +54,7 @@ dependencies {
     compile 'org.roboguice:roboguice:3.0.1'
     provided 'org.roboguice:roboblender:3.0.1'
     compile 'org.slf4j:slf4j-api:1.7.12'
-    compile 'org.slf4j:slf4j-android:1.7.12'
+    compile 'com.github.tony19:logback-android-classic:1.1.1-4'
 
     compile 'com.jakewharton:butterknife:7.0.1'
 
