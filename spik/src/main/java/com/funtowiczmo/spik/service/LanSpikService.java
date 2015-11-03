@@ -1,6 +1,5 @@
 package com.funtowiczmo.spik.service;
 
-import android.app.Service;
 import android.content.Intent;
 import com.funtowicz.spik.sms.transport.listeners.SpikClientListener;
 import com.funtowiczmo.spik.lan.LanSpikClient;

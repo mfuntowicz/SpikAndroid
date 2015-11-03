@@ -1,15 +1,15 @@
 package com.funtowiczmo.spik.service;
 
-import android.app.*;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
 import android.content.Intent;
-import android.graphics.drawable.Icon;
-import android.os.Binder;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import com.funtowiczmo.spik.ConnectionActivity;
 import com.funtowiczmo.spik.R;
 import com.funtowiczmo.spik.lang.Computer;
-import com.funtowiczmo.spik.lang.Phone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
