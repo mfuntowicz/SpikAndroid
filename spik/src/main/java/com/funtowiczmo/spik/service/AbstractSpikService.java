@@ -9,16 +9,20 @@ import android.os.IBinder;
 import android.support.annotation.Nullable;
 import com.funtowiczmo.spik.ConnectionActivity;
 import com.funtowiczmo.spik.R;
+import com.funtowiczmo.spik.context.SpikContext;
 import com.funtowiczmo.spik.lang.Computer;
+import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import roboguice.RoboGuice;
+import roboguice.service.RoboService;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by momo- on 27/10/2015.
  */
-public abstract class AbstractSpikService extends Service {
+public abstract class AbstractSpikService extends RoboService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractSpikService.class);
 
@@ -26,19 +30,25 @@ public abstract class AbstractSpikService extends Service {
     private static final int DISCONNECTED_NOTIFICATION_ID = 2;
 
     /** System resources **/
+    @Inject
     private NotificationManager notificationManager;
 
     /** Spik resouces **/
     private final AtomicBoolean isInForeground = new AtomicBoolean(false);
 
+    private SpikContext spikContext;
+
     @Override
     public void onCreate() {
-        LOGGER.info("Creating Service");
-        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        super.onCreate();
+
+        spikContext = RoboGuice.getInjector(this).getInstance(SpikContext.class);
+        LOGGER.info("Spik Service Created");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        super.onStartCommand(intent, flags, startId);
         return Service.START_NOT_STICKY;
     }
 
@@ -89,7 +99,6 @@ public abstract class AbstractSpikService extends Service {
                     .build();
 
             notification.flags = Notification.FLAG_NO_CLEAR;
-
             startForeground(CONNECTED_NOTIFICATION_ID, notification);
         }
     }
