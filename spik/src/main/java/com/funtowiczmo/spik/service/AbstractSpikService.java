@@ -1,12 +1,13 @@
 package com.funtowiczmo.spik.service;
 
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
+import android.app.*;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
+import android.telephony.SmsManager;
 import com.funtowicz.spik.sms.transport.SpikClient;
 import com.funtowiczmo.spik.ConnectionActivity;
 import com.funtowiczmo.spik.R;
@@ -14,6 +15,7 @@ import com.funtowiczmo.spik.context.SpikContext;
 import com.funtowiczmo.spik.lang.Computer;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.lang.Conversation;
+import com.funtowiczmo.spik.lang.Message;
 import com.funtowiczmo.spik.utils.CurrentPhone;
 import com.funtowiczmo.spik.utils.LazyCursorIterator;
 import com.google.inject.Inject;
@@ -22,7 +24,10 @@ import org.slf4j.LoggerFactory;
 import roboguice.RoboGuice;
 import roboguice.service.RoboService;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by momo- on 27/10/2015.
@@ -37,6 +42,7 @@ public abstract class AbstractSpikService extends RoboService {
     /** System resources **/
     @Inject
     private NotificationManager notificationManager;
+    private SmsManager smsManager = SmsManager.getDefault();
 
     /** Spik resouces **/
     private final AtomicBoolean isInForeground = new AtomicBoolean(false);
@@ -123,7 +129,7 @@ public abstract class AbstractSpikService extends RoboService {
         }
     }
 
-    private void sendConversations() {
+    protected void sendConversations() {
         try(LazyCursorIterator<Conversation> it = spikContext.messageRepository().getConversations()){
             while (it.hasNext()){
                 final Conversation c = it.next();
@@ -135,6 +141,80 @@ public abstract class AbstractSpikService extends RoboService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    protected void sendMessage(long tid, String[] participants, String text){
+        assert participants.length > 0 : "No participants provided";
+        assert text != null : "No text in the message";
+
+        LOGGER.info("Sending message to {}", Arrays.toString(participants));
+
+        final String SENT = "SMS_SENT";
+
+        final ArrayList<String> smsParts = smsManager.divideMessage(text);
+        final SmsSentReceiver smsSentReceiver = new SmsSentReceiver(tid, smsParts.size());
+
+        final PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, new Intent(SENT), 0);
+        final ArrayList<PendingIntent> sentIntents = new ArrayList<>();
+
+        LOGGER.debug("Sms converted into {} parts", smsParts.size());
+
+        for (int i = 0; i < smsParts.size(); i++) {
+            sentIntents.add(sentPI);
+        }
+
+        registerReceiver(smsSentReceiver, new IntentFilter(SENT));
+
+        for (String participant : participants) {
+            smsManager.sendMultipartTextMessage(participant, null, smsParts, sentIntents, null);
+        }
+    }
+
+    protected void sendMessageStateChanged(long tid, Message.State state){
+        LOGGER.info("Sending new state ({}) for message {}", state, tid);
+
+        spikClient.sendMessageStateChanged(tid, state);
+    }
+
+    /**
+     * Listen for Sms Part sending events
+     */
+    private class SmsSentReceiver extends BroadcastReceiver{
+
+        private final long messageId;
+        private final AtomicInteger partsCounter;
+
+        public SmsSentReceiver(long messageId, int parts) {
+            this.messageId = messageId;
+            this.partsCounter = new AtomicInteger(parts);
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            switch (getResultCode()) {
+                case Activity.RESULT_OK:
+                    if(partsCounter.decrementAndGet() == 0){
+                        LOGGER.debug("Received Sent Part Event, remaining {}", partsCounter.get());
+                        sendResult(Message.State.SENT);
+                    }
+                    break;
+                case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+                case SmsManager.RESULT_ERROR_NO_SERVICE:
+                case SmsManager.RESULT_ERROR_NULL_PDU:
+                case SmsManager.RESULT_ERROR_RADIO_OFF:
+                    LOGGER.debug("Sms was not sent, errno : {}", getResultCode());
+                    sendResult(Message.State.FAILED);
+                    break;
+            }
+        }
+
+        private void sendResult(Message.State state){
+            //Remove receiver
+            AbstractSpikService.this.unregisterReceiver(this);
+
+            //Send result to server
+            sendMessageStateChanged(messageId, state);
         }
     }
 }

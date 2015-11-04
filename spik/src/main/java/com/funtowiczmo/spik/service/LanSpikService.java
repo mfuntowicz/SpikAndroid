@@ -47,6 +47,11 @@ public class LanSpikService extends AbstractSpikService  {
                 showDisconnectedNotification(computer);
                 stopSpik();
             }
+
+            @Override
+            public void onSendSmsMessage(long tid, String[] participants, String text) {
+                sendMessage(tid, participants, text);
+            }
         });
     }
 
