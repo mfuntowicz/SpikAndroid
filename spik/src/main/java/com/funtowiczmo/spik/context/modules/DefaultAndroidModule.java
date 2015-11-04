@@ -1,4 +1,4 @@
-package com.funtowiczmo.spik.modules;
+package com.funtowiczmo.spik.context.modules;
 
 import com.funtowiczmo.spik.repositories.ContactRepository;
 import com.funtowiczmo.spik.repositories.MessageRepository;
