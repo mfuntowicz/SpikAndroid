@@ -22,19 +22,25 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
-import static com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl.*;
+import static com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl.DISCOVERY_ENDED_HANDLER_MSG;
+import static com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl.DISCOVERY_STARTED_HANDLER_MSG;
 
 public class ConnectionActivity extends AppCompatActivity {
 
     /** Constants **/
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionActivity.class);
 
+    static {
+        System.setProperty("io.netty.noKeySetOptimization", "true");
+    }
+
+    /**
+     * Service reference
+     **/
+    Intent serviceIntent = null;
      /** UI Model **/
 
     private ProgressDialog progressDialog;
-
-    /** Service reference **/
-    Intent serviceIntent = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
