@@ -8,17 +8,21 @@ import android.content.IntentFilter;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.telephony.SmsManager;
-import com.funtowicz.spik.sms.transport.SpikClient;
+import com.funtowiczmo.spik.BuildConfig;
+import com.funtowiczmo.spik.ConnectedActivity;
 import com.funtowiczmo.spik.ConnectionActivity;
 import com.funtowiczmo.spik.R;
 import com.funtowiczmo.spik.context.SpikContext;
-import com.funtowiczmo.spik.lang.Computer;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.lang.Conversation;
 import com.funtowiczmo.spik.lang.Message;
+import com.funtowiczmo.spik.protocol.ServiceMessages;
+import com.funtowiczmo.spik.sms.SpikClient;
+import com.funtowiczmo.spik.sms.lang.Computer;
 import com.funtowiczmo.spik.utils.CurrentPhone;
 import com.funtowiczmo.spik.utils.LazyCursorIterator;
 import com.google.inject.Inject;
+import com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import roboguice.RoboGuice;
@@ -38,15 +42,17 @@ public abstract class AbstractSpikService extends RoboService {
 
     private static final int CONNECTED_NOTIFICATION_ID = 1;
     private static final int DISCONNECTED_NOTIFICATION_ID = 2;
-
-    /** System resources **/
+    /**
+     * Spik resouces
+     **/
+    private final AtomicBoolean isInForeground = new AtomicBoolean(false);
+    protected Computer computer;
+    /**
+     * System resources
+     **/
     @Inject
     private NotificationManager notificationManager;
     private SmsManager smsManager = SmsManager.getDefault();
-
-    /** Spik resouces **/
-    private final AtomicBoolean isInForeground = new AtomicBoolean(false);
-
     private SpikContext spikContext;
     private SpikClient spikClient;
 
@@ -72,19 +78,20 @@ public abstract class AbstractSpikService extends RoboService {
 
     @Nullable
     @Override
-    public IBinder onBind(Intent intent) { return null; }
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
 
     /**
      * Show a notification about the disconnection
-     * @param c
      */
-    protected void showDisconnectedNotification(Computer c){
+    protected void showDisconnectedNotification() {
         PendingIntent contentIntent = PendingIntent.getActivity(this, (int) System.currentTimeMillis(), new Intent(this, ConnectionActivity.class), 0);
 
         Notification notification = new Notification.Builder(this)
                 .setContentTitle(getResources().getString(R.string.app_name))
-                .setContentText(getResources().getString(R.string.local_service_finished, c.name()))
-                .setTicker(c.name())
+                .setContentText(getResources().getString(R.string.local_service_finished, computer.name()))
+                .setTicker("Disconnected")
                 .setWhen(System.currentTimeMillis())
                 .setSmallIcon(R.drawable.ic_launcher)
                 .setContentIntent(contentIntent)
@@ -94,10 +101,12 @@ public abstract class AbstractSpikService extends RoboService {
         notificationManager.notify(DISCONNECTED_NOTIFICATION_ID, notification);
     }
 
-    protected void launchSpik(Computer computer, SpikClient client){
-        LOGGER.info("Starting Spik Service");
+    protected void launchSpik(SpikClient client) {
+        LOGGER.info("Starting Spik Service, connecting to {}", computer);
 
-        if(isInForeground.compareAndSet(false, true)) {
+        if (isInForeground.compareAndSet(false, true)) {
+            spikClient = client;
+
             PendingIntent contentIntent = PendingIntent.getActivity(this, (int) System.currentTimeMillis(), new Intent(this, ConnectionActivity.class), 0);
 
             Notification notification = new Notification.Builder(this)
@@ -113,40 +122,73 @@ public abstract class AbstractSpikService extends RoboService {
             notification.flags = Notification.FLAG_NO_CLEAR;
             startForeground(CONNECTED_NOTIFICATION_ID, notification);
 
-            spikClient = client;
 
-            client.sendHello(CurrentPhone.CURRENT_PHONE);
-            sendConversations();
+            LOGGER.debug("Starting to send information in a background thread");
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    sendHello();
+                    sendConversations();
+                }
+            }, "SpikService Initialization Thread");
+            t.start();
+
+
+            //Let's start ConnectedActivity
+            LOGGER.debug("Launching ConnectedActivity");
+
+            Intent i = new Intent(getApplicationContext(), ConnectedActivity.class);
+
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+            i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+
+            i.putExtra(ConnectedActivity.COMPUTER_NAME_EXTRA, computer.name());
+
+            startActivity(i);
+
+
         }
     }
 
-    protected void stopSpik(){
-        LOGGER.info("Stopping Spik Service");
-        if(isInForeground.compareAndSet(true, false)){
+    /**
+     * Stop the service if running
+     */
+    protected void stopSpik() {
+        if (isInForeground.compareAndSet(true, false)) {
+            LOGGER.info("Stopping Spik Service");
+
             spikClient = null;
             stopForeground(true);
             stopSelf();
+        } else {
+            LOGGER.warn("Trying to stop a service not running");
         }
     }
 
     protected void sendConversations() {
-        try(LazyCursorIterator<Conversation> it = spikContext.messageRepository().getConversations()){
-            while (it.hasNext()){
+        try (LazyCursorIterator<Conversation> it = spikContext.messageRepository().getConversations()) {
+            while (it.hasNext()) {
                 final Conversation c = it.next();
                 for (Contact contact : c.participants()) {
-                    spikClient.sendContact(contact);
+                    sendContact(contact);
                 }
 
-                spikClient.sendConversation(c);
+                sendConversation(c);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    protected void sendMessage(long tid, String[] participants, String text){
-        assert participants.length > 0 : "No participants provided";
-        assert text != null : "No text in the message";
+    protected void sendMessage(long tid, String[] participants, String text) {
+        if (BuildConfig.DEBUG) {
+            if (participants.length <= 0)
+                throw new RuntimeException("No participants provided");
+
+            if (text == null)
+                throw new RuntimeException("No text in the message");
+        }
 
         LOGGER.info("Sending message to {}", Arrays.toString(participants));
 
@@ -171,16 +213,103 @@ public abstract class AbstractSpikService extends RoboService {
         }
     }
 
-    protected void sendMessageStateChanged(long tid, Message.State state){
-        LOGGER.info("Sending new state ({}) for message {}", state, tid);
+    /**
+     * Send an HELLO message to the computer
+     */
+    private void sendHello() {
+        LOGGER.info("Sending HELLO {}", CurrentPhone.CURRENT_PHONE);
 
-        spikClient.sendMessageStateChanged(tid, state);
+        spikClient.send(
+                ServiceMessages.ServiceMessage.newBuilder().setHello(
+                        ServiceMessages.ServiceMessage.Hello.newBuilder()
+                                .setName(CurrentPhone.CURRENT_PHONE.name())
+                                .setManufacturer(CurrentPhone.CURRENT_PHONE.manufacturer())
+                                .setModel(CurrentPhone.CURRENT_PHONE.model())
+                                .setOs(ServiceMessages.ServiceMessage.OperatingSystem.ANDROID)
+                                .setSdkVersion(CurrentPhone.CURRENT_PHONE.sdkVersion())
+                )
+        );
     }
+
+    /**
+     * Send a contact to the remote
+     * @param c
+     */
+    private void sendContact(Contact c) {
+        LOGGER.info("Sending contact {}", c.id());
+
+        ServiceMessages.ServiceMessage.Contact.Builder msg = ServiceMessages.ServiceMessage.Contact.newBuilder()
+                .setId(c.id())
+                .setName(c.name())
+                .setPhone(c.phone());
+
+        if (c.hasPhoto())
+            msg.setPicture(ByteString.copyFrom(c.photo()));
+
+        spikClient.send(ServiceMessages.ServiceMessage.newBuilder().setContact(msg));
+    }
+
+    /**
+     * Send a conversation to the remote
+     *
+     * @param c
+     */
+    private void sendConversation(Conversation c) {
+
+        ServiceMessages.ServiceMessage.Conversation.Builder msg =
+                ServiceMessages.ServiceMessage.Conversation.newBuilder().setId(c.id());
+
+        for (Contact contact : c.participants()) {
+            msg.addParticipants(contact.id());
+        }
+
+        for (Message message : c.messages()) {
+            msg.addMessages(
+                    ServiceMessages.ServiceMessage.Sms.newBuilder()
+                            .setId(message.id())
+                            .setRead(message.isRead())
+                            .setText(message.text())
+                            .setStatus(
+                                    message.state() == Message.State.RECEIVED ?
+                                            ServiceMessages.ServiceMessage.Status.RECEIVED :
+                                            message.state() == Message.State.SENT ? ServiceMessages.ServiceMessage.Status.SENT : ServiceMessages.ServiceMessage.Status.SENDING
+                            )
+            );
+        }
+
+        spikClient.send(ServiceMessages.ServiceMessage.newBuilder().setConversation(msg));
+    }
+
+    private void sendMessageStateChanged(long mId, Message.State state) {
+        LOGGER.info("Sending new state ({}) for message {}", state, mId);
+
+        ServiceMessages.ServiceMessage.StatusChanged.Builder msg =
+                ServiceMessages.ServiceMessage.StatusChanged.newBuilder()
+                        .setMid(mId);
+
+        switch (state) {
+            case DRAFT:
+            case FAILED:
+            case PENDING:
+            case QUEUED:
+                msg.setStatus(ServiceMessages.ServiceMessage.Status.SENDING);
+                break;
+            case RECEIVED:
+                msg.setStatus(ServiceMessages.ServiceMessage.Status.RECEIVED);
+                break;
+            case SENT:
+                msg.setStatus(ServiceMessages.ServiceMessage.Status.SENT);
+                break;
+        }
+
+        spikClient.send(ServiceMessages.ServiceMessage.newBuilder().setStatusChanged(msg));
+    }
+
 
     /**
      * Listen for Sms Part sending events
      */
-    private class SmsSentReceiver extends BroadcastReceiver{
+    private class SmsSentReceiver extends BroadcastReceiver {
 
         private final long messageId;
         private final AtomicInteger partsCounter;
@@ -194,7 +323,7 @@ public abstract class AbstractSpikService extends RoboService {
         public void onReceive(Context context, Intent intent) {
             switch (getResultCode()) {
                 case Activity.RESULT_OK:
-                    if(partsCounter.decrementAndGet() == 0){
+                    if (partsCounter.decrementAndGet() == 0) {
                         LOGGER.debug("Received Sent Part Event, remaining {}", partsCounter.get());
                         sendResult(Message.State.SENT);
                     }
@@ -209,7 +338,7 @@ public abstract class AbstractSpikService extends RoboService {
             }
         }
 
-        private void sendResult(Message.State state){
+        private void sendResult(Message.State state) {
             //Remove receiver
             AbstractSpikService.this.unregisterReceiver(this);
 

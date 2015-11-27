@@ -6,7 +6,7 @@ package com.funtowiczmo.spik.network.lan;
 
 import android.os.Handler;
 import com.funtowiczmo.spik.lan.discovery.LanDiscoveryClientCallback;
-import com.funtowiczmo.spik.lang.Computer;
+import com.funtowiczmo.spik.sms.lang.Computer;
 
 import java.util.Collection;
 
@@ -30,6 +30,7 @@ public class LanDiscoveryClientCallbackImpl implements LanDiscoveryClientCallbac
     public void onDiscoveryStarted() {
         handler.obtainMessage(DISCOVERY_STARTED_HANDLER_MSG).sendToTarget();
     }
+
 
     @Override
     public void onDiscoveryDone(Collection<Computer> collection) {

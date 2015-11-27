@@ -1,7 +1,7 @@
 package com.funtowiczmo.spik.utils;
 
 import android.os.Build;
-import com.funtowiczmo.spik.lang.Phone;
+import com.funtowiczmo.spik.sms.lang.Phone;
 
 /**
  * Created by momo- on 02/11/2015.

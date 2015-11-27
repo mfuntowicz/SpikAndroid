@@ -17,20 +17,24 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.AppCompat" >
-        <meta-data android:name="roboguice.modules"
-                   android:value="com.funtowiczmo.spik.context.modules.DefaultAndroidModule" />
+        <meta-data
+                android:name="roboguice.modules"
+                android:value="com.funtowiczmo.spik.context.modules.DefaultAndroidModule"/>
+
         <activity
             android:name=".ConnectionActivity"
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <service android:name=".service.LanSpikService" />
 
+        <activity
+                android:name=".ConnectedActivity"
+                android:label="@string/connexion_information_label">
+        </activity>
     </application>
 
 </manifest>

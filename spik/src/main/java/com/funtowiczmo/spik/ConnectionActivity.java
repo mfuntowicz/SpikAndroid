@@ -12,9 +12,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import com.funtowiczmo.spik.lan.discovery.LanDiscoveryClient;
-import com.funtowiczmo.spik.lang.Computer;
 import com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl;
 import com.funtowiczmo.spik.service.LanSpikService;
+import com.funtowiczmo.spik.sms.lang.Computer;
 import com.funtowiczmo.spik.ui.ComputerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,7 +123,7 @@ public class ConnectionActivity extends AppCompatActivity {
                                         intent.putExtra(LanSpikService.COMPUTER_IP_EXTRA, computer.ip());
                                         intent.putExtra(LanSpikService.COMPUTER_PORT_EXTRA, computer.port());
 
-                                        LOGGER.info("Selected computer {}", computer);
+                                        LOGGER.info("Selected ic_computer {}", computer);
 
                                         if(serviceIntent == null)
                                             serviceIntent = intent;

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Spik</string>
     <string name="connect_lan">Connect on Wifi</string>
-    <string name="connection_error">A problem occured while connecting to computer</string>
+    <string name="connection_error">A problem occurred while connecting to computer</string>
     <string name="no_remote_computer_found">No computer found to connect on</string>
     <string name="no_lan_adapter">No WiFi adapter found</string>
     <string name="ask_for_enable_lan">Please turn on the WiFi</string>
@@ -14,4 +14,9 @@
     <string name="no_host_help">Please, check you are connected to the same network than your computer</string>
     <string name="local_service_finished">Spik is now disconnected from %1$s</string>
     <string name="local_service_started">Spik is connected to %1$s</string>
+    <string name="connect_usb">Connect on USB</string>
+    <string name="connect_bluetooth">Connect on Bluetooth</string>
+    <string name="connexion_information_label">Information about connexion</string>
+    <string name="disconnect_btn">Disconnect</string>
+    <string name="connexion_information_details">Connected to %1$s computer</string>
 </resources>

@@ -3,7 +3,6 @@ package com.funtowiczmo.spik.repositories;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.utils.LazyCursorIterator;
 
-import java.util.Collection;
 import java.util.List;
 
 /**

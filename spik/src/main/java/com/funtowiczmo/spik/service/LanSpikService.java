@@ -1,13 +1,15 @@
 package com.funtowiczmo.spik.service;
 
 import android.content.Intent;
-import com.funtowicz.spik.sms.transport.listeners.SpikClientListener;
 import com.funtowiczmo.spik.lan.LanSpikClient;
-import com.funtowiczmo.spik.lang.Computer;
+import com.funtowiczmo.spik.protocol.ServiceMessages;
+import com.funtowiczmo.spik.sms.lang.Computer;
+import com.funtowiczmo.spik.sms.listeners.AbstractSpikServiceListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -15,42 +17,42 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class LanSpikService extends AbstractSpikService  {
 
-    private final AtomicBoolean isStarted = new AtomicBoolean(false);
-
     /** Lan Service Constants **/
     public static final String COMPUTER_NAME_EXTRA = "name";
     public static final String COMPUTER_OS_EXTRA = "os";
     public static final String COMPUTER_IP_EXTRA = "ip";
     public static final String COMPUTER_PORT_EXTRA = "port";
-
-
     private static final Logger LOGGER = LoggerFactory.getLogger(LanSpikService.class);
+    private final AtomicBoolean isStarted = new AtomicBoolean(false);
     private final LanSpikClient client;
 
     public LanSpikService() {
-        client = new LanSpikClient(new SpikClientListener() {
+        client = new LanSpikClient(new AbstractSpikServiceListener() {
+
             @Override
-            public void onConnected(Computer computer) {
-                LOGGER.info("Connected to computer {}", computer);
-                launchSpik(computer, client);
+            public void onConnected() {
+                launchSpik(client);
             }
 
             @Override
-            public void onConnectionException(Computer computer, Throwable throwable) {
-                throwable.printStackTrace();
-                LOGGER.warn("Connection exception {}, {}", computer, throwable.getMessage());
+            public void onExceptionOccured(Throwable t) {
+                t.printStackTrace();
+                LOGGER.warn("Connection exception {}", t.getMessage());
             }
 
             @Override
-            public void onDisconnected(Computer computer) {
-                LOGGER.info("Disconnected from computer {}", computer);
-                showDisconnectedNotification(computer);
+            public void onDisconnected() {
+                LOGGER.info("Disconnected");
+                showDisconnectedNotification();
                 stopSpik();
             }
 
             @Override
-            public void onSendSmsMessage(long tid, String[] participants, String text) {
-                sendMessage(tid, participants, text);
+            public void handleSendMessage(ServiceMessages.ServiceMessage.SendMessage msg) {
+                String[] participants = new String[msg.getParticipantsCount()];
+                msg.getParticipantsList().toArray(participants);
+
+                sendMessage(msg.getMid(), participants, msg.getText());
             }
         });
     }
@@ -63,7 +65,7 @@ public class LanSpikService extends AbstractSpikService  {
             final String ip = intent.getStringExtra(COMPUTER_IP_EXTRA);
             final int port = intent.getIntExtra(COMPUTER_PORT_EXTRA, -1);
 
-            final Computer remote = new Computer(name, os, ip, port);
+            computer = new Computer(name, os, ip, port);
 
             if(ip == null) {
                 LOGGER.error("IP is null, cannot start -> aborting");
@@ -73,7 +75,7 @@ public class LanSpikService extends AbstractSpikService  {
                 stopSelf();
             }else{
                 try {
-                    client.connect(remote);
+                    client.connect(new InetSocketAddress(computer.ip(), computer.port()));
                 } catch (InterruptedException e) {
                     LOGGER.warn("Unable to connect to {}:{} -> {}", ip, port, e.getMessage());
                     stopSelf();
