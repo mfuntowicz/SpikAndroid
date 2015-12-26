@@ -3,7 +3,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:1.1.1'
+        classpath 'com.android.tools.build:gradle:1.2.3'
     }
 }
 apply plugin: 'com.android.application'
@@ -58,5 +58,5 @@ dependencies {
 
     compile 'com.jakewharton:butterknife:7.0.1'
 
-    compile group:"com.funtowiczmo", name:"spik-sms-lan", version:"1.0-SNAPSHOT", changing:true
+    compile group: "com.polytech", name: "spik-sms-lan", version: "1.0-SNAPSHOT", changing: true
 }
