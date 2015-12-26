@@ -9,14 +9,17 @@ import android.net.Uri;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.lang.Conversation;
 import com.funtowiczmo.spik.lang.Message;
+import com.funtowiczmo.spik.lang.ThreadedMessage;
 import com.funtowiczmo.spik.repositories.ContactRepository;
 import com.funtowiczmo.spik.repositories.MessageRepository;
+import com.funtowiczmo.spik.repositories.observers.MessageObserver;
 import com.funtowiczmo.spik.utils.LazyCursorIterator;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static android.provider.Telephony.*;
 
@@ -35,10 +38,19 @@ public class DefaultMessageRepository implements MessageRepository {
         Sms.READ,
     };
 
+    private static final String[] SMS_PROJECTION_WITH_THREAD = new String[]{
+            Sms.DATE,
+            Sms.BODY,
+            Sms.TYPE,
+            Sms.READ,
+            Sms.THREAD_ID
+    };
+
     private static final int SMS_DATE_IDX = 0;
     private static final int SMS_BODY_IDX = 1;
     private static final int SMS_TYPE_IDX = 2;
     private static final int SMS_READ_IDX = 3;
+    private static final int SMS_THREAD_IDX = 4;
 
 
     /** MMS Constants **/
@@ -75,12 +87,70 @@ public class DefaultMessageRepository implements MessageRepository {
         this.contactRepository = contactRepository;
     }
 
+    /**
+     * Convert internal Android messages state to Spik one
+     *
+     * @param state Android state
+     * @return
+     */
+    private static Message.State getMessageState(int state) {
+        switch (state) {
+            case Sms.MESSAGE_TYPE_DRAFT:
+                return Message.State.DRAFT;
+            case Sms.MESSAGE_TYPE_FAILED:
+                return Message.State.FAILED;
+            case Sms.MESSAGE_TYPE_INBOX:
+                return Message.State.RECEIVED;
+            case Sms.MESSAGE_TYPE_SENT:
+                return Message.State.SENT;
+            case Sms.MESSAGE_TYPE_QUEUED:
+                return Message.State.QUEUED;
+            case Sms.MESSAGE_TYPE_OUTBOX:
+                return Message.State.PENDING;
+            default:
+                return Message.State.PENDING;
+        }
+    }
+
+    @Override
+    public ThreadedMessage getSmsById(long id) throws Exception {
+        LOGGER.trace("Trying to get SMS with id : {}", id);
+
+        try (Cursor c = repository.query(Sms.CONTENT_URI, SMS_PROJECTION_WITH_THREAD,
+                Sms._ID + " = ?",
+                new String[]{String.valueOf(id)}, null)) {
+
+            if (c.moveToFirst()) {
+                long thread = c.getLong(SMS_THREAD_IDX);
+                Message msg = getMessageFromCursor(c);
+
+                return new ThreadedMessage(thread, msg);
+            }
+        }
+
+        throw new Exception("Unable to find SMS with id " + id);
+    }
+
+    @Override
+    public long getLastReceivedMessageId() throws Exception {
+        LOGGER.trace("Trying to get last SMS ID in the repository");
+        try (Cursor c = repository.query(Sms.Inbox.CONTENT_URI, new String[]{Sms._ID}, null, null, null)) {
+            if (c.moveToFirst()) {
+
+                if (LOGGER.isDebugEnabled())
+                    LOGGER.debug("Cursor items : {}", c.getCount());
+
+                return c.getLong(0);
+            }
+        }
+
+        throw new Exception("Unable retrieve last ID from content provider");
+    }
+
     @Override
     @SuppressLint("Recycle")
     public LazyCursorIterator<Conversation> getConversations() {
         LOGGER.info("Trying to get all conversations");
-
-        final String[] PROJECTION = new String[]{ Mms.THREAD_ID, Sms.ADDRESS, Mms._ID };
 
         Cursor c = repository.query(MmsSms.CONTENT_CONVERSATIONS_URI, null, null, null, null);
         return new ConversationIterator(c, true);
@@ -94,18 +164,31 @@ public class DefaultMessageRepository implements MessageRepository {
         final List<Message> sms = getSMSForThread(threadId);
         final List<Message> mms = getMMSForThread(threadId);
 
-        final List<Message> messages = new ArrayList<>((sms != null ? sms.size() : 0) + (mms != null ? mms.size() : 0));
+        final List<Message> messages = new ArrayList<>(
+                (sms != null ? sms.size() : 0) + (mms != null ? mms.size() : 0)
+        );
+
         if(sms != null)
             messages.addAll(sms);
 
-        if(mms != null)
-            messages.addAll(mms);
+        /*if(mms != null)
+            messages.addAll(mms);*/
 
 
         if(LOGGER.isDebugEnabled())
             LOGGER.debug("Retrieved {} messages for conversation {}", messages.size(), threadId);
 
         return new Conversation(threadId, contacts, messages);
+    }
+
+    @Override
+    public void registerObserver(MessageObserver observer) {
+        LOGGER.info("Registering Observer '{}' for Uri : {}", observer.name(), observer.target());
+
+        repository.registerContentObserver(observer.target(), false, observer);
+
+        if (LOGGER.isDebugEnabled())
+            LOGGER.debug("Observer '{}' registered", observer.name());
     }
 
     private List<Message> getMMSForThread(long threadId) {
@@ -139,7 +222,6 @@ public class DefaultMessageRepository implements MessageRepository {
         return null;
     }
 
-
     private List<Message> getSMSForThread(long threadId){
         LOGGER.info("Getting all messages for conversation {}", threadId);
         final Uri SMS_URI = ContentUris.withAppendedId(Sms.Conversations.CONTENT_URI, threadId);
@@ -155,13 +237,8 @@ public class DefaultMessageRepository implements MessageRepository {
 
                     messages = new ArrayList<>(c.getCount());
 
-                    do{
-                        messages.add(new Message(
-                                c.getLong(SMS_DATE_IDX),
-                                c.getString(SMS_BODY_IDX),
-                                c.getInt(SMS_READ_IDX) == 1,
-                                getMessageState(c.getInt(SMS_TYPE_IDX))
-                        ));
+                    do {
+                        messages.add(getMessageFromCursor(c));
                     }while (c.moveToNext());
                 }else{
                     LOGGER.warn("Unable to move to the first row, might have 0 message in the conversation  (Cursor#getCount() = {})", c.getCount());
@@ -174,7 +251,8 @@ public class DefaultMessageRepository implements MessageRepository {
         return messages;
     }
 
-    /**
+    /**12-26 18:10:59.224    4251-4775/com.funtowiczmo.spik W/com.funtowiczmo.spik.repositories.observers.MessageObserver﹕ 18:10:59.224 [Binder_3] WARN  c.f.s.r.observers.MessageObserver - The message 3827 was null after #getSmsById()
+
      * Query the provider for the participants in the thread
      * @param threadId Id of thread we want to get the participants
      * @return Null if thread not found.
@@ -218,28 +296,13 @@ public class DefaultMessageRepository implements MessageRepository {
         return recipients == null ? null : contactRepository.getContactsByPhone(recipients);
     }
 
-    /**
-     * Convert internal Android messages state to Spik one
-     * @param state Android state
-     * @return
-     */
-    private static Message.State getMessageState(int state) {
-        switch (state){
-            case Sms.MESSAGE_TYPE_DRAFT:
-                return Message.State.DRAFT;
-            case Sms.MESSAGE_TYPE_FAILED:
-                return Message.State.FAILED;
-            case Sms.MESSAGE_TYPE_INBOX:
-                return Message.State.RECEIVED;
-            case Sms.MESSAGE_TYPE_SENT:
-                return Message.State.SENT;
-            case Sms.MESSAGE_TYPE_QUEUED:
-                return Message.State.QUEUED;
-            case Sms.MESSAGE_TYPE_OUTBOX:
-                return Message.State.PENDING;
-            default:
-                return Message.State.PENDING;
-        }
+    private Message getMessageFromCursor(Cursor c) {
+        return new Message(
+                c.getLong(SMS_DATE_IDX),
+                c.getString(SMS_BODY_IDX),
+                c.getInt(SMS_READ_IDX) == 1,
+                getMessageState(c.getInt(SMS_TYPE_IDX))
+        );
     }
 
     private class ConversationIterator extends LazyCursorIterator<Conversation> {
