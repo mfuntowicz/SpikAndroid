@@ -5,8 +5,8 @@ package com.funtowiczmo.spik.network.lan;
  */
 
 import android.os.Handler;
-import com.funtowiczmo.spik.lan.discovery.LanDiscoveryClientCallback;
-import com.funtowiczmo.spik.sms.lang.Computer;
+import com.polytech.spik.domain.Computer;
+import com.polytech.spik.sms.discovery.LanDiscoveryClientCallback;
 
 import java.util.Collection;
 

@@ -9,7 +9,7 @@ import android.widget.TextView;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import com.funtowiczmo.spik.R;
-import com.funtowiczmo.spik.sms.lang.Computer;
+import com.polytech.spik.domain.Computer;
 
 import java.util.List;
 

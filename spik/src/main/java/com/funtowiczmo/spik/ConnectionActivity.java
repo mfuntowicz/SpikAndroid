@@ -11,11 +11,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import com.funtowiczmo.spik.lan.discovery.LanDiscoveryClient;
 import com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl;
 import com.funtowiczmo.spik.service.LanSpikService;
-import com.funtowiczmo.spik.sms.lang.Computer;
 import com.funtowiczmo.spik.ui.ComputerAdapter;
+import com.funtowiczmo.spik.utils.CurrentPhone;
+import com.polytech.spik.domain.Computer;
+import com.polytech.spik.sms.discovery.LanDiscoveryClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +153,7 @@ public class ConnectionActivity extends AppCompatActivity {
             public void run() {
                 try(LanDiscoveryClient client = new LanDiscoveryClient(new LanDiscoveryClientCallbackImpl(handler))){
                     client.connect();
-                    client.sendDiscoveryRequest();
+                    client.sendDiscoveryRequest(CurrentPhone.CURRENT_PHONE);
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
