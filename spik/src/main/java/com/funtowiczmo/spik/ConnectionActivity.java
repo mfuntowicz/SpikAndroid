@@ -4,6 +4,8 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -11,6 +13,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 import com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl;
 import com.funtowiczmo.spik.service.LanSpikService;
 import com.funtowiczmo.spik.ui.ComputerAdapter;
@@ -21,6 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.List;
 
 import static com.funtowiczmo.spik.network.lan.LanDiscoveryClientCallbackImpl.DISCOVERY_ENDED_HANDLER_MSG;
@@ -148,16 +155,33 @@ public class ConnectionActivity extends AppCompatActivity {
         });
 
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try(LanDiscoveryClient client = new LanDiscoveryClient(new LanDiscoveryClientCallbackImpl(handler))){
+        try {
+
+            final InetAddress wifiIp = getWifiIp();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                try (LanDiscoveryClient client = new LanDiscoveryClient(new LanDiscoveryClientCallbackImpl(handler))) {
                     client.connect();
-                    client.sendDiscoveryRequest(CurrentPhone.CURRENT_PHONE);
+                    client.sendDiscoveryRequest(new CurrentPhone(new InetSocketAddress(wifiIp, 1)));
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
-            }
-        }).start();
+                }
+            }).start();
+        } catch (UnknownHostException e) {
+            LOGGER.warn("Unable to get WIFI Ip", e);
+
+            Toast.makeText(this, getString(R.string.unable_get_wifi_ip), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    public InetAddress getWifiIp() throws UnknownHostException {
+        WifiManager wifiMgr = (WifiManager) getSystemService(WIFI_SERVICE);
+        WifiInfo wifiInfo = wifiMgr.getConnectionInfo();
+        int ip = wifiInfo.getIpAddress();
+        byte[] bytes = BigInteger.valueOf(ip).toByteArray();
+        return InetAddress.getByAddress(bytes);
     }
 }

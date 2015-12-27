@@ -35,7 +35,7 @@ public class Contact {
 
 
     public boolean hasPhoto() {
-        return phone != null;
+        return photo != null;
     }
 
     public byte[] photo() {
