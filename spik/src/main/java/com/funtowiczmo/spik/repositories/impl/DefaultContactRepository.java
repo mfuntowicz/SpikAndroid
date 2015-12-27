@@ -89,7 +89,7 @@ public class DefaultContactRepository implements ContactRepository {
 
         try(Cursor c = repository.query(CONTENT_URI, DEFAULT_PROJECTION, SELECTION, FILTER, null)){
             if(c.moveToFirst()){
-                return parseContact(c);
+                return contactFromCursor(c);
             }
         }
 
@@ -116,7 +116,7 @@ public class DefaultContactRepository implements ContactRepository {
         try (Cursor c = repository.query(LOOKUP_URI, PHONE_LK_DEFAULT_PROJECTION, null, null, null)){
             if(c != null){
                 if(c.moveToFirst()){
-                    return parseContact(c);
+                    return contactFromCursor(c);
                 }else{
                     LOGGER.warn("Unable to move to the first row");
                 }
@@ -154,7 +154,7 @@ public class DefaultContactRepository implements ContactRepository {
      * @param c
      * @return
      */
-    private Contact parseContact(Cursor c){
+    private Contact contactFromCursor(Cursor c) {
         return new Contact(
                 c.getLong(ID_IDX),
                 c.getString(DISPLAY_NAME_IDX),
@@ -201,7 +201,7 @@ public class DefaultContactRepository implements ContactRepository {
 
         @Override
         protected Contact handleEntity(Cursor c) {
-            return parseContact(c);
+            return contactFromCursor(c);
         }
     }
 }
