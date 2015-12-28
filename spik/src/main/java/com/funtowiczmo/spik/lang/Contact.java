@@ -16,7 +16,7 @@ public class Contact {
 
     public Contact(long id, String name, String phone, byte[] photo) {
         this.id = id;
-        this.name = name;
+        this.name = name == null ? phone : name.isEmpty() ? phone : name;
         this.phone = phone;
         this.photo = photo;
     }
