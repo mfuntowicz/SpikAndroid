@@ -36,7 +36,7 @@ public interface MessageRepository {
      * @param id Conversation's id
      * @return
      */
-    Conversation getConversationById(long id);
+    Conversation getConversationById(long id) throws Exception;
 
     /**
      * Try to find a conversation in which all the contact are taking part
