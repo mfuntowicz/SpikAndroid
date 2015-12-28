@@ -3,7 +3,6 @@ package com.funtowiczmo.spik.repositories;
 import com.funtowiczmo.spik.lang.Conversation;
 import com.funtowiczmo.spik.lang.ThreadedMessage;
 import com.funtowiczmo.spik.repositories.observers.MessageObserver;
-import com.funtowiczmo.spik.utils.LazyCursorIterator;
 
 /**
  * Created by momo- on 27/10/2015.
@@ -29,7 +28,7 @@ public interface MessageRepository {
      * Return all the conversations
      * @return
      */
-    LazyCursorIterator<Conversation> getConversations();
+    Iterable<? extends Conversation> getConversations();
 
     /**
      * Try to find a conversation according to his id

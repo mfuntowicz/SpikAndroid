@@ -1,22 +1,23 @@
 package com.funtowiczmo.spik.utils;
 
-import android.database.*;
+import android.database.Cursor;
+import android.database.CursorWrapper;
 
 import java.util.Iterator;
 
 /**
  * Created by mfuntowicz on 29/10/15.
  */
-public abstract class LazyCursorIterator<T> implements Iterator<T>, AutoCloseable {
+public abstract class CursorIterator<T> implements Iterator<T>, AutoCloseable {
 
     private final Cursor cursor;
     private final UnmodifiableCursor wrapper;
 
-    protected LazyCursorIterator(Cursor cursor){
+    protected CursorIterator(Cursor cursor){
         this(cursor, false);
     }
 
-    protected LazyCursorIterator(Cursor cursor, boolean reset){
+    protected CursorIterator(Cursor cursor, boolean reset){
         this.cursor = cursor;
         this.wrapper = new UnmodifiableCursor(cursor);
 
@@ -43,7 +44,7 @@ public abstract class LazyCursorIterator<T> implements Iterator<T>, AutoCloseabl
         if(cursor.isBeforeFirst())
             throw new IllegalStateException("Cursor is before the first row, you might be missing to call hasNext()");
 
-        return handleEntity(wrapper);
+        return fillFromCursor(wrapper);
     }
 
     public void reset(){
@@ -63,7 +64,7 @@ public abstract class LazyCursorIterator<T> implements Iterator<T>, AutoCloseabl
      * @param cursor
      * @return
      */
-    protected abstract T handleEntity(Cursor cursor);
+    protected abstract T fillFromCursor(Cursor cursor);
 
     /**
      * Create a cursor which disable moving operations. Only the current position is accessible.
