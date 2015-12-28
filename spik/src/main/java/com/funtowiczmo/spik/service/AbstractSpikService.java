@@ -19,7 +19,7 @@ import com.funtowiczmo.spik.lang.Conversation;
 import com.funtowiczmo.spik.lang.Message;
 import com.funtowiczmo.spik.lang.ThreadedMessage;
 import com.funtowiczmo.spik.repositories.observers.MessageObserver;
-import com.funtowiczmo.spik.utils.LazyCursorIterator;
+import com.funtowiczmo.spik.utils.CursorIterator;
 import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 import com.polytech.spik.domain.Computer;
@@ -30,6 +30,7 @@ import roboguice.service.RoboService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -186,17 +187,17 @@ public abstract class AbstractSpikService extends RoboService {
     }
 
     protected void sendConversations() {
-        try (LazyCursorIterator<Conversation> it = spikContext.messageRepository().getConversations()) {
-            while (it.hasNext()) {
-                final Conversation c = it.next();
-                for (Contact contact : c.participants()) {
-                    sendContact(contact);
-                }
+        for (Conversation c : spikContext.messageRepository().getConversations()) {
+            for (long id : c.participants()) {
 
-                sendConversation(c);
+                Contact contact = spikContext.contactRepository().getContactById(id);
+                if(contact != null)
+                    sendContact(contact);
+                else
+                    LOGGER.warn("Repository returned null contact for id {}", id);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+
+            sendConversation(c);
         }
     }
 
@@ -259,22 +260,28 @@ public abstract class AbstractSpikService extends RoboService {
 
         SpikMessages.Conversation.Builder msg = SpikMessages.Conversation.newBuilder().setId(c.id());
 
-        for (Contact contact : c.participants()) {
-            msg.addParticipants(contact.id());
+        for (long contact : c.participants()) {
+            msg.addParticipants(contact);
         }
 
-        for (Message message : c.messages()) {
-            msg.addMessages(
+        try(CursorIterator<Message> it = c.messages(this)){
+            while (it.hasNext()) {
+                Message message = it.next();
+                msg.addMessages(
                     SpikMessages.Sms.newBuilder()
-                            .setDate(message.id())
-                            .setRead(message.isRead())
-                            .setText(message.text())
-                            .setStatus(
-                                    message.state() == Message.State.RECEIVED ?
-                                            SpikMessages.Status.READ :
-                                            message.state() == Message.State.SENT ? SpikMessages.Status.SENT : SpikMessages.Status.SENDING
-                            )
-            );
+                        .setDate(message.id())
+                        .setRead(message.isRead())
+                        .setText(message.text())
+                        .setStatus(
+                            message.state() == Message.State.RECEIVED ?
+                                    SpikMessages.Status.READ :
+                                    message.state() == Message.State.SENT ?
+                                            SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+                        )
+                );
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Error while iterating on message for conversation " + c.id(), e);
         }
 
         lowSend(SpikMessages.Wrapper.newBuilder().setConversation(msg));
