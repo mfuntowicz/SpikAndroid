@@ -1,13 +1,14 @@
 package com.funtowiczmo.spik.repositories.impl;
 
-import android.annotation.SuppressLint;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.ContactsContract;
 import android.support.annotation.Nullable;
+import android.telephony.PhoneNumberUtils;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.repositories.ContactRepository;
 import com.funtowiczmo.spik.utils.CursorIterator;
@@ -29,8 +30,8 @@ public class DefaultContactRepository implements ContactRepository {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultContactRepository.class);
 
-    private static final String PHONE_SEPARATOR = ";";
-    private static final String ISO_2_COUNTRY_CODE = Locale.getDefault().getISO3Country().substring(0, 2);
+    public static final String PHONE_SEPARATOR = ";";
+    public static final String ISO_2_COUNTRY_CODE = Locale.getDefault().getISO3Country().substring(0, 2);
 
     /** Contact Constant **/
     private static final int ID_IDX = 0;
@@ -47,10 +48,10 @@ public class DefaultContactRepository implements ContactRepository {
     /** Phone Lookup Constants **/
     /** We use the same order as DEFAULT_PROJECTION, no need to redefined indexes **/
     private static final String[] PHONE_LK_DEFAULT_PROJECTION = new String[]{
-            ContactsContract.PhoneLookup._ID,
-            ContactsContract.PhoneLookup.LOOKUP_KEY,
-            ContactsContract.PhoneLookup.DISPLAY_NAME,
-            ContactsContract.PhoneLookup.NORMALIZED_NUMBER,
+        ContactsContract.PhoneLookup._ID,
+        ContactsContract.PhoneLookup.LOOKUP_KEY,
+        ContactsContract.PhoneLookup.DISPLAY_NAME,
+        ContactsContract.PhoneLookup.NORMALIZED_NUMBER
     };
 
     private final ContentResolver repository;
@@ -108,11 +109,17 @@ public class DefaultContactRepository implements ContactRepository {
     }
 
     @Override
-    @SuppressLint("NewApi")
     public Contact getContactByPhone(String phone) {
         LOGGER.info("Looking contact with phone {}", phone);
 
-        Uri LOOKUP_URI = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phone));
+        String phoneParam;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+            phoneParam = PhoneNumberUtils.formatNumberToE164(phone, ISO_2_COUNTRY_CODE);
+        }else{
+            phoneParam = phone;
+        }
+
+        Uri LOOKUP_URI = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneParam));
         try (Cursor c = repository.query(LOOKUP_URI, PHONE_LK_DEFAULT_PROJECTION, null, null, null)){
             if(c != null){
                 if(c.moveToFirst()){
