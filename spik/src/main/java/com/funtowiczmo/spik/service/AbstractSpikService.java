@@ -267,18 +267,30 @@ public abstract class AbstractSpikService extends RoboService {
         try(CursorIterator<Message> it = c.messages(this)){
             while (it.hasNext()) {
                 Message message = it.next();
-                msg.addMessages(
-                    SpikMessages.Sms.newBuilder()
-                        .setDate(message.id())
-                        .setRead(message.isRead())
-                        .setText(message.text())
-                        .setStatus(
-                            message.state() == Message.State.RECEIVED ?
-                                SpikMessages.Status.READ :
-                                message.state() == Message.State.SENT ?
-                                        SpikMessages.Status.SENT : SpikMessages.Status.SENDING
-                        )
-                );
+                if(message != null) {
+                    SpikMessages.Sms.Builder sms = SpikMessages.Sms.newBuilder()
+                            .setDate(message.id())
+                            .setRead(message.isRead())
+                            .setText(message.text())
+                            .setStatus(
+                                    message.state() == Message.State.RECEIVED ?
+                                            SpikMessages.Status.READ :
+                                            message.state() == Message.State.SENT ?
+                                                    SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+                            );
+
+                    if (message.attachment().isPresent()) {
+                        final Message.Attachment attachment = message.attachment().get();
+
+                        LOGGER.trace("Handling MMS ({} : {} bytes)",
+                                attachment.mimeType(), attachment.length());
+
+                        sms.setExtension(SpikMessages.mimeType, attachment.mimeType());
+                        sms.setExtension(SpikMessages.data, ByteString.copyFrom(attachment.data()));
+                    }
+
+                    msg.addMessages(sms);
+                }
             }
         } catch (Exception e) {
             LOGGER.warn("Error while iterating on message for conversation " + c.id(), e);

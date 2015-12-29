@@ -58,13 +58,16 @@ public class SmartMessageRepository implements MessageRepository {
 
     /** SMS/MMS related constants **/
     private static final Uri MMS_SMS_BASE_URI = Telephony.MmsSms.CONTENT_CONVERSATIONS_URI;
+    private  static final String MMS_MULTIPART_RELATED = "application/vnd.wap.multipart.related";
 
     private static final String[] ALL_SMS_MMS_PROJECTION = {
         Telephony.MmsSms.TYPE_DISCRIMINATOR_COLUMN,
         Telephony.Sms.DATE,
         Telephony.Sms.BODY,
         Telephony.Sms.READ,
-        Telephony.Sms.TYPE
+        Telephony.Sms.TYPE,
+        Telephony.Mms.CONTENT_TYPE,
+        Telephony.Mms.TEXT_ONLY
     };
 
     private static final int MMS_SMS_DISCRIMINATOR  = 0;
@@ -72,6 +75,13 @@ public class SmartMessageRepository implements MessageRepository {
     private static final int MMS_SMS_BODY           = 2;
     private static final int MMS_SMS_READ           = 3;
     private static final int MMS_SMS_TYPE           = 4;
+    private static final int MMS_SMS_CONTENT_TYPE   = 5;
+/*    private static final int MMS_SMS_TEXT_ONLY      = 6;
+    private static final int MMS_SMS_   = 6;
+    private static final int MMS_SMS_TEXT_ONLY      = 6;*/
+
+    /** MMS.Part related constants **/
+    //private static final Uri MMS_BASE_URI = Telephony.Mms.Part.
 
     /** Instance variables **/
     private Context context;
@@ -152,6 +162,20 @@ public class SmartMessageRepository implements MessageRepository {
     public void registerObserver(MessageObserver observer) {
 
     }
+
+    private Message fillSmsFromCursor(Cursor cursor){
+        return new Message(
+                cursor.getLong(MMS_SMS_DATE),
+                cursor.getString(MMS_SMS_BODY),
+                cursor.getInt(MMS_SMS_READ) == 1,
+                Message.State.fromStatus(cursor.getInt(MMS_SMS_TYPE))
+        );
+    }
+
+    private Message fillMmsFromCursor(Cursor cursor){
+        return null;
+    }
+
 
     /**
      * Retrieve all the threads in the database
@@ -314,22 +338,32 @@ public class SmartMessageRepository implements MessageRepository {
         }
 
         @Override
-        public CursorIterator<Message> messages(Context context) {
+        public CursorIterator<Message> messages(final Context context) {
             final Uri MESSAGES_URI = ContentUris.withAppendedId(MMS_SMS_BASE_URI, id);
 
             //Retrieve only SMS
             //TODO : Retrieve MMS
-            Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, null);
+            final Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, null);
             return new CursorIterator<Message>(c, true){
 
                 @Override
                 protected Message fillFromCursor(Cursor cursor) {
-                    return new Message(
-                        cursor.getLong(MMS_SMS_DATE),
-                        cursor.getString(MMS_SMS_BODY),
-                        cursor.getInt(MMS_SMS_READ) == 1,
-                        Message.State.fromStatus(cursor.getInt(MMS_SMS_TYPE))
-                    );
+                    final String type = cursor.getString(MMS_SMS_DISCRIMINATOR);
+
+                    if(type.equals("sms")) {
+                        return fillSmsFromCursor(c);
+                    }else if(type.equals("mms")){
+                        String contentType = cursor.getString(MMS_SMS_CONTENT_TYPE);
+                        if(MMS_MULTIPART_RELATED.equals(contentType))
+                            return fillMmsFromCursor(c);
+                        else
+                            LOGGER.trace(REPO_MARKER, "MMS Content-Type not supported {}", contentType);
+
+                    }else{
+                        LOGGER.warn(REPO_MARKER, "Unable to deserialize message with type {}", type);
+                    }
+
+                    return null;
                 }
             };
         }
