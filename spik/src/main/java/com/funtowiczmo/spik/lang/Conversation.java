@@ -25,7 +25,7 @@ public interface Conversation {
      * Id of the recipients of the conversation
      * @return
      */
-    long[] participants();
+    String[] participants();
 
     /**
      * Number of messages
