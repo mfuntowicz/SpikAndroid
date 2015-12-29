@@ -282,8 +282,10 @@ public abstract class AbstractSpikService extends RoboService {
                     if (message.attachment().isPresent()) {
                         final Message.Attachment attachment = message.attachment().get();
 
-                        LOGGER.trace("Handling MMS ({} : {} bytes)",
-                                attachment.mimeType(), attachment.length());
+                        LOGGER.trace(
+                            "Handling MMS ({} : {} bytes)",
+                            attachment.mimeType(), attachment.length()
+                        );
 
                         sms.setExtension(SpikMessages.mimeType, attachment.mimeType());
                         sms.setExtension(SpikMessages.data, ByteString.copyFrom(attachment.data()));
