@@ -30,7 +30,6 @@ import roboguice.service.RoboService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -188,13 +187,13 @@ public abstract class AbstractSpikService extends RoboService {
 
     protected void sendConversations() {
         for (Conversation c : spikContext.messageRepository().getConversations()) {
-            for (long id : c.participants()) {
+            for (String address : c.participants()) {
 
-                Contact contact = spikContext.contactRepository().getContactById(id);
+                Contact contact = spikContext.contactRepository().getContactByPhone(address);
                 if(contact != null)
                     sendContact(contact);
                 else
-                    LOGGER.warn("Repository returned null contact for id {}", id);
+                    LOGGER.warn("Repository returned null contact with phone {}", address);
             }
 
             sendConversation(c);
@@ -260,8 +259,9 @@ public abstract class AbstractSpikService extends RoboService {
 
         SpikMessages.Conversation.Builder msg = SpikMessages.Conversation.newBuilder().setId(c.id());
 
-        for (long contact : c.participants()) {
-            msg.addParticipants(contact);
+        for (String recipient : c.participants()) {
+            Contact contact = spikContext.contactRepository().getContactByPhone(recipient);
+            msg.addParticipants(contact.id());
         }
 
         try(CursorIterator<Message> it = c.messages(this)){
@@ -274,9 +274,9 @@ public abstract class AbstractSpikService extends RoboService {
                         .setText(message.text())
                         .setStatus(
                             message.state() == Message.State.RECEIVED ?
-                                    SpikMessages.Status.READ :
-                                    message.state() == Message.State.SENT ?
-                                            SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+                                SpikMessages.Status.READ :
+                                message.state() == Message.State.SENT ?
+                                        SpikMessages.Status.SENT : SpikMessages.Status.SENDING
                         )
                 );
             }

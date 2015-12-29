@@ -177,7 +177,7 @@ public class SmartMessageRepository implements MessageRepository {
                         conv = new CachedConversation(c);
                         threadsCache.put(threadId, conv);
                     }else {
-                        CachedConversation.fillFromCursor(c, conv);
+                        conv.fillFromCursor(c);
                     }
                 }
 
@@ -282,15 +282,15 @@ public class SmartMessageRepository implements MessageRepository {
     /**
      * Represents an entry in the conversation cache
      */
-    private static class CachedConversation implements Conversation {
+    private  class CachedConversation implements Conversation {
 
         private long id;
         private long date;
         private int messagesCount;
-        private long[] recipients;
+        private String[] recipients;
 
         public CachedConversation(Cursor cursor){
-            fillFromCursor(cursor, this);
+            fillFromCursor(cursor);
         }
 
         @Override
@@ -304,7 +304,7 @@ public class SmartMessageRepository implements MessageRepository {
         }
 
         @Override
-        public long[] participants() {
+        public String[] participants() {
             return recipients;
         }
 
@@ -334,28 +334,21 @@ public class SmartMessageRepository implements MessageRepository {
             };
         }
 
-        public static Conversation fillFromCursor(Cursor c, CachedConversation conv){
-            conv.id = c.getLong(THREADS_ID);
-            conv.date = c.getLong(THREADS_DATE);
-            conv.messagesCount = c.getInt(THREADS_MESSAGE_COUNT);
-            conv.recipients = parseRecipients(c.getString(THREADS_RECIPIENT_IDS));
+        public Conversation fillFromCursor(Cursor c){
+            final List<RecipientCacheEntry> recipientsEntries =
+                    getAddresses(c.getString(THREADS_RECIPIENT_IDS), " ");
 
-            return conv;
-        }
-
-        private static long[] parseRecipients(String recipients) {
-            String[] ids = recipients.split(" ");
-            long[] lIds = new long[ids.length];
-
-            for (int i = 0; i < ids.length; i++) {
-                try{
-                    lIds[i] = Long.parseLong(ids[i]);
-                }catch (NumberFormatException e){
-                    LOGGER.warn(REPO_MARKER, "Unable to parse Thread ID {} as long", ids[i]);
-                }
+            final String[] addresses = new String[recipientsEntries.size()];
+            for (int i = 0; i < recipientsEntries.size(); i++) {
+                addresses[i] = recipientsEntries.get(i).number;
             }
 
-            return lIds;
+            id = c.getLong(THREADS_ID);
+            date = c.getLong(THREADS_DATE);
+            messagesCount = c.getInt(THREADS_MESSAGE_COUNT);
+            recipients = addresses;
+
+            return this;
         }
     }
 }
