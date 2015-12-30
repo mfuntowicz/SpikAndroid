@@ -261,44 +261,49 @@ public abstract class AbstractSpikService extends RoboService {
 
         for (String recipient : c.participants()) {
             Contact contact = spikContext.contactRepository().getContactByPhone(recipient);
-            msg.addParticipants(contact.id());
+
+            if(contact != null) {
+                msg.addParticipants(contact.id());
+            }
         }
 
-        try(CursorIterator<Message> it = c.messages(this)){
-            while (it.hasNext()) {
-                Message message = it.next();
-                if(message != null) {
-                    SpikMessages.Sms.Builder sms = SpikMessages.Sms.newBuilder()
-                            .setDate(message.id())
-                            .setRead(message.isRead())
-                            .setText(message.text())
-                            .setStatus(
-                                    message.state() == Message.State.RECEIVED ?
-                                            SpikMessages.Status.READ :
-                                            message.state() == Message.State.SENT ?
-                                                    SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+        if(msg.getParticipantsCount() > 0) {
+            try (CursorIterator<Message> it = c.messages(this)) {
+                while (it.hasNext()) {
+                    Message message = it.next();
+                    if (message != null) {
+                        SpikMessages.Sms.Builder sms = SpikMessages.Sms.newBuilder()
+                                .setDate(message.id())
+                                .setRead(message.isRead())
+                                .setText(message.text())
+                                .setStatus(
+                                        message.state() == Message.State.RECEIVED ?
+                                                SpikMessages.Status.READ :
+                                                message.state() == Message.State.SENT ?
+                                                        SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+                                );
+
+                        if (message.attachment().isPresent()) {
+                            final Message.Attachment attachment = message.attachment().get();
+
+                            LOGGER.trace(
+                                    "Handling MMS ({} : {} bytes)",
+                                    attachment.mimeType(), attachment.length()
                             );
 
-                    if (message.attachment().isPresent()) {
-                        final Message.Attachment attachment = message.attachment().get();
+                            sms.setExtension(SpikMessages.mimeType, attachment.mimeType());
+                            sms.setExtension(SpikMessages.data, ByteString.copyFrom(attachment.data()));
+                        }
 
-                        LOGGER.trace(
-                            "Handling MMS ({} : {} bytes)",
-                            attachment.mimeType(), attachment.length()
-                        );
-
-                        sms.setExtension(SpikMessages.mimeType, attachment.mimeType());
-                        sms.setExtension(SpikMessages.data, ByteString.copyFrom(attachment.data()));
+                        msg.addMessages(sms);
                     }
-
-                    msg.addMessages(sms);
                 }
+            } catch (Exception e) {
+                LOGGER.warn("Error while iterating on message for conversation " + c.id(), e);
             }
-        } catch (Exception e) {
-            LOGGER.warn("Error while iterating on message for conversation " + c.id(), e);
-        }
 
-        lowSend(SpikMessages.Wrapper.newBuilder().setConversation(msg));
+            lowSend(SpikMessages.Wrapper.newBuilder().setConversation(msg));
+        }
     }
 
     private void sendMessageStateChanged(long mId, Message.State state) {
