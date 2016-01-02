@@ -58,13 +58,17 @@ public class SmartMessageRepository implements MessageRepository {
 
     /** SMS/MMS related constants **/
     private static final Uri MMS_SMS_BASE_URI = Telephony.MmsSms.CONTENT_CONVERSATIONS_URI;
+    private  static final String MMS_MULTIPART_RELATED = "application/vnd.wap.multipart.related";
 
     private static final String[] ALL_SMS_MMS_PROJECTION = {
         Telephony.MmsSms.TYPE_DISCRIMINATOR_COLUMN,
         Telephony.Sms.DATE,
         Telephony.Sms.BODY,
         Telephony.Sms.READ,
-        Telephony.Sms.TYPE
+        Telephony.Sms.TYPE,
+        Telephony.Mms.CONTENT_TYPE,
+        Telephony.Mms.TEXT_ONLY,
+        Telephony.Mms.THREAD_ID
     };
 
     private static final int MMS_SMS_DISCRIMINATOR  = 0;
@@ -72,6 +76,14 @@ public class SmartMessageRepository implements MessageRepository {
     private static final int MMS_SMS_BODY           = 2;
     private static final int MMS_SMS_READ           = 3;
     private static final int MMS_SMS_TYPE           = 4;
+    private static final int MMS_SMS_CONTENT_TYPE   = 5;
+    private static final int MMS_SMS_THREAD_ID   = 6;
+/*    private static final int MMS_SMS_TEXT_ONLY      = 6;
+    private static final int MMS_SMS_   = 6;
+    private static final int MMS_SMS_TEXT_ONLY      = 6;*/
+
+    /** MMS.Part related constants **/
+    //private static final Uri MMS_BASE_URI = Telephony.Mms.Part.
 
     /** Instance variables **/
     private Context context;
@@ -85,7 +97,7 @@ public class SmartMessageRepository implements MessageRepository {
         this.threadsCache = new ConcurrentHashMap<>();
 
 
-        //Listen for modification in RECIPIENTS_CANONICAL_URI Database
+        //Listen for modification in RECIPIENTS_CANONICAL_URI DatabaseALL_SMS_MMS_PROJECTION
         ContentObserver recipientsObserver = new ContentObserver(null) {
             @Override
             public void onChange(boolean selfChange, Uri uri) {
@@ -116,12 +128,28 @@ public class SmartMessageRepository implements MessageRepository {
 
     @Override
     public ThreadedMessage getSmsById(long id) throws Exception {
-        return null;
+        LOGGER.trace("Trying to get SMS with id : {}", id);
+            try (Cursor c = context.getContentResolver().query(Telephony.Sms.Inbox.CONTENT_URI,
+                    new String[]{Telephony.Sms._ID, Telephony.Sms.DATE, Telephony.Sms.BODY, Telephony.Sms.READ, Telephony.Sms.TYPE, Telephony.Sms.THREAD_ID },
+                    Telephony.Sms._ID+ " = ?",new String[]{String.valueOf(id)}, null)) {
+            if (c.moveToFirst()) {
+                long thread = c.getLong(c.getColumnIndex(Telephony.Sms.THREAD_ID));
+                Message msg = fillSmsFromCursor(c);
+                return new ThreadedMessage(thread, msg);
+            }
+        }
+        throw new Exception("Unable to find SMS with id " + id);
     }
 
     @Override
     public long getLastReceivedMessageId() throws Exception {
-        return 0;
+        LOGGER.trace("Trying to get last SMS ID in the repository");
+        try (Cursor c = context.getContentResolver().query(Telephony.MmsSms.CONTENT_CONVERSATIONS_URI, new String[]{Telephony.Sms._ID}, null, null, Telephony.Sms.DATE + " DESC")) {
+            if (c.moveToFirst())
+                return c.getLong(0);
+
+        }
+        throw new Exception("Unable retrieve last ID from content provider");
     }
 
     @Override
@@ -150,8 +178,22 @@ public class SmartMessageRepository implements MessageRepository {
 
     @Override
     public void registerObserver(MessageObserver observer) {
-
+        context.getContentResolver().registerContentObserver(observer.target(), false, observer);
     }
+
+    private Message fillSmsFromCursor(Cursor cursor){
+        return new Message(
+                cursor.getLong(MMS_SMS_DATE),
+                cursor.getString(MMS_SMS_BODY),
+                cursor.getInt(MMS_SMS_READ) == 1,
+                Message.State.fromStatus(cursor.getInt(MMS_SMS_TYPE))
+        );
+    }
+
+    private Message fillMmsFromCursor(Cursor cursor){
+        return null;
+    }
+
 
     /**
      * Retrieve all the threads in the database
@@ -314,22 +356,32 @@ public class SmartMessageRepository implements MessageRepository {
         }
 
         @Override
-        public CursorIterator<Message> messages(Context context) {
+        public CursorIterator<Message> messages(final Context context) {
             final Uri MESSAGES_URI = ContentUris.withAppendedId(MMS_SMS_BASE_URI, id);
 
             //Retrieve only SMS
             //TODO : Retrieve MMS
-            Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, null);
+            final Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, null);
             return new CursorIterator<Message>(c, true){
 
                 @Override
                 protected Message fillFromCursor(Cursor cursor) {
-                    return new Message(
-                        cursor.getLong(MMS_SMS_DATE),
-                        cursor.getString(MMS_SMS_BODY),
-                        cursor.getInt(MMS_SMS_READ) == 1,
-                        Message.State.fromStatus(cursor.getInt(MMS_SMS_TYPE))
-                    );
+                    final String type = cursor.getString(MMS_SMS_DISCRIMINATOR);
+
+                    if(type.equals("sms")) {
+                        return fillSmsFromCursor(c);
+                    }else if(type.equals("mms")){
+                        String contentType = cursor.getString(MMS_SMS_CONTENT_TYPE);
+                        if(MMS_MULTIPART_RELATED.equals(contentType))
+                            return fillMmsFromCursor(c);
+                        else
+                            LOGGER.trace(REPO_MARKER, "MMS Content-Type not supported {}", contentType);
+
+                    }else{
+                        LOGGER.warn(REPO_MARKER, "Unable to deserialize message with type {}", type);
+                    }
+
+                    return null;
                 }
             };
         }

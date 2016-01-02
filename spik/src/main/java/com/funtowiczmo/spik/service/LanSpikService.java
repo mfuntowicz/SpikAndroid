@@ -1,7 +1,9 @@
 package com.funtowiczmo.spik.service;
 
 import android.content.Intent;
-import com.polytech.spik.domain.Computer;
+import android.os.IBinder;
+import android.support.annotation.Nullable;
+import com.funtowiczmo.spik.lang.RemoteComputer;
 import com.polytech.spik.protocol.SpikMessages;
 import com.polytech.spik.sms.service.LanSmsClient;
 import com.polytech.spik.sms.service.LanSmsHandler;
@@ -9,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -16,17 +20,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class LanSpikService extends AbstractSpikService  {
 
-    /** Lan Service Constants **/
+    /** Intent related **/
     public static final String COMPUTER_NAME_EXTRA = "name";
     public static final String COMPUTER_OS_EXTRA = "os";
     public static final String COMPUTER_OS_VERSION_EXTRA = "version";
     public static final String COMPUTER_IP_EXTRA = "ip";
     public static final String COMPUTER_PORT_EXTRA = "port";
 
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LanSpikService.class);
 
     private final AtomicBoolean isStarted = new AtomicBoolean(false);
     private final LanSmsClient client;
+
+    private LanComputer computer;
+
+    public static Intent fillIntent(Intent i, String name, String os, String version, String ip, int port) throws IllegalArgumentException {
+
+        i.putExtra(LanSpikService.COMPUTER_NAME_EXTRA, name);
+        i.putExtra(LanSpikService.COMPUTER_OS_EXTRA, os);
+        i.putExtra(LanSpikService.COMPUTER_OS_VERSION_EXTRA, version);
+        i.putExtra(LanSpikService.COMPUTER_IP_EXTRA, ip);
+        i.putExtra(LanSpikService.COMPUTER_PORT_EXTRA, port);
+
+        return i;
+    }
 
     public LanSpikService() {
         client = new LanSmsClient(new LanSmsHandler() {
@@ -68,46 +86,43 @@ public class LanSpikService extends AbstractSpikService  {
         });
     }
 
+    @Nullable
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    public IBinder onBind(Intent intent) {
+        IBinder binder = super.onBind(intent);
+
         if(isStarted.compareAndSet(false, true)){
-            final String name = intent.getStringExtra(COMPUTER_NAME_EXTRA);
-            final String os = intent.getStringExtra(COMPUTER_OS_EXTRA);
-            final String version = intent.getStringExtra(COMPUTER_OS_VERSION_EXTRA);
-            final String ip = intent.getStringExtra(COMPUTER_IP_EXTRA);
-            final int port = intent.getIntExtra(COMPUTER_PORT_EXTRA, -1);
-
-            computer = new Computer(name, os, version, ip, port);
-
-            if(ip == null) {
-                LOGGER.error("IP is null, cannot start -> aborting");
-                stopSelf();
-            }else if(port < 0){
-                LOGGER.error("port < 0 ({}), cannot start -> aborting", port);
-                stopSelf();
-            }else{
-                try {
-                    client.connect(computer.ip(), computer.port());
-                } catch (InterruptedException e) {
-                    LOGGER.warn("Unable to connect to {}:{} -> {}", ip, port, e.getMessage());
-                    stopSelf();
-                }
+            try {
+                client.connect(computer.ip(), computer.port());
+            } catch (InterruptedException e) {
+                LOGGER.warn("Unable to connect to {}:{} -> {}", computer.ip(), computer.port(), e.getMessage());
+                stopSpik();
             }
         }
 
-        return super.onStartCommand(intent, flags, startId);
+        return binder;
     }
 
     @Override
     public void onDestroy() {
         try {
-            if (client != null)
-                client.close();
-        } catch (IOException e) {
-            LOGGER.warn("Caught an exception", e);
+            stopSpik();
         } finally {
             super.onDestroy();
         }
+    }
+
+    @Override
+    protected RemoteComputer initService(Intent intent) {
+        computer =  new LanComputer(
+            intent.getStringExtra(COMPUTER_NAME_EXTRA),
+            intent.getStringExtra(COMPUTER_OS_EXTRA),
+            intent.getStringExtra(COMPUTER_OS_VERSION_EXTRA),
+            intent.getStringExtra(COMPUTER_IP_EXTRA),
+            intent.getIntExtra(COMPUTER_PORT_EXTRA, 0)
+        );
+
+        return computer;
     }
 
     @Override
@@ -117,6 +132,73 @@ public class LanSpikService extends AbstractSpikService  {
             client.lowSend(msg);
         } else {
             LOGGER.debug("Client is null, unable to send message to the computer");
+        }
+    }
+
+    @Override
+    public void disconnect() {
+        if(client != null) {
+            try {
+                client.close();
+            } catch (IOException e) {
+                LOGGER.warn("Got exception while closing LanSpikService", e);
+            }
+        }
+    }
+
+
+    /**
+     * Represents a computer connected on a TCP socket
+     */
+    private final class LanComputer implements RemoteComputer {
+
+        private final String name;
+        private final String os;
+        private final String version;
+        private final InetSocketAddress address;
+
+        public LanComputer(String name, String os, String version, String ip, int port) {
+            this.name = name;
+            this.os = os;
+            this.version = version;
+            this.address = new InetSocketAddress(ip, port);
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public String os() {
+            return os;
+        }
+
+        @Override
+        public String version() {
+            return version;
+        }
+
+        public String ip(){
+            return address.getHostString();
+        }
+
+        public int port(){
+            return address.getPort();
+        }
+
+        public SocketAddress adress(){
+            return address;
+        }
+
+        @Override
+        public String toString() {
+            return "LanComputer{" +
+                    "name='" + name + '\'' +
+                    ", os='" + os + '\'' +
+                    ", version='" + version + '\'' +
+                    ", address=" + address +
+                    '}';
         }
     }
 }

@@ -32,7 +32,7 @@
         <service android:name=".service.LanSpikService" />
 
         <activity
-                android:name=".ConnectedActivity"
+                android:name=".activites.LanConnectedActivity"
                 android:label="@string/connexion_information_label">
         </activity>
     </application>

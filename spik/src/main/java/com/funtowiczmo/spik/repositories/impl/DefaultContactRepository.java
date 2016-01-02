@@ -132,7 +132,7 @@ public class DefaultContactRepository implements ContactRepository {
             }
         }
 
-        return null;
+        return new Contact(phone.hashCode(), phone, phone);
     }
 
     @Override
