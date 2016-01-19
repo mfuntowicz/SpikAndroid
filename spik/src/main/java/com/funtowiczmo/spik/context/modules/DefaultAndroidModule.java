@@ -3,7 +3,7 @@ package com.funtowiczmo.spik.context.modules;
 import com.funtowiczmo.spik.repositories.ContactRepository;
 import com.funtowiczmo.spik.repositories.MessageRepository;
 import com.funtowiczmo.spik.repositories.impl.DefaultContactRepository;
-import com.funtowiczmo.spik.repositories.impl.DefaultMessageRepository;
+import com.funtowiczmo.spik.repositories.impl.SmartMessageRepository;
 import com.google.inject.AbstractModule;
 
 /**
@@ -15,6 +15,6 @@ public class DefaultAndroidModule extends AbstractModule {
     @Override
     protected void configure() {
         bind(ContactRepository.class).to(DefaultContactRepository.class);
-        bind(MessageRepository.class).to(DefaultMessageRepository.class);
+        bind(MessageRepository.class).to(SmartMessageRepository.class);
     }
 }

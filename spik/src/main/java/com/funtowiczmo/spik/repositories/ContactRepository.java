@@ -1,7 +1,7 @@
 package com.funtowiczmo.spik.repositories;
 
 import com.funtowiczmo.spik.lang.Contact;
-import com.funtowiczmo.spik.utils.LazyCursorIterator;
+import com.funtowiczmo.spik.utils.CursorIterator;
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ public interface ContactRepository {
      * Return all the contacts
      * @return
      */
-    LazyCursorIterator<Contact> getContacts();
+    CursorIterator<Contact> getContacts();
 
     /**
      * Try to find a contact according to his id
@@ -27,7 +27,7 @@ public interface ContactRepository {
      * @param desc Descriptive string for the contact (name, phone, ...)
      * @return
      */
-    LazyCursorIterator<Contact> getContactByName(String desc);
+    CursorIterator<Contact> getContactByName(String desc);
 
 
     /**

@@ -5,11 +5,13 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.ContactsContract;
 import android.support.annotation.Nullable;
+import android.telephony.PhoneNumberUtils;
 import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.repositories.ContactRepository;
-import com.funtowiczmo.spik.utils.LazyCursorIterator;
+import com.funtowiczmo.spik.utils.CursorIterator;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,10 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import static android.provider.ContactsContract.CommonDataKinds.Phone.*;
 
@@ -31,7 +30,8 @@ public class DefaultContactRepository implements ContactRepository {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultContactRepository.class);
 
-    private static final String PHONE_SEPARATOR = " ";
+    public static final String PHONE_SEPARATOR = ";";
+    public static final String ISO_2_COUNTRY_CODE = Locale.getDefault().getISO3Country().substring(0, 2);
 
     /** Contact Constant **/
     private static final int ID_IDX = 0;
@@ -48,10 +48,10 @@ public class DefaultContactRepository implements ContactRepository {
     /** Phone Lookup Constants **/
     /** We use the same order as DEFAULT_PROJECTION, no need to redefined indexes **/
     private static final String[] PHONE_LK_DEFAULT_PROJECTION = new String[]{
-            ContactsContract.PhoneLookup._ID,
-            ContactsContract.PhoneLookup.LOOKUP_KEY,
-            ContactsContract.PhoneLookup.DISPLAY_NAME,
-            ContactsContract.PhoneLookup.NORMALIZED_NUMBER,
+        ContactsContract.PhoneLookup._ID,
+        ContactsContract.PhoneLookup.LOOKUP_KEY,
+        ContactsContract.PhoneLookup.DISPLAY_NAME,
+        ContactsContract.PhoneLookup.NORMALIZED_NUMBER
     };
 
     private final ContentResolver repository;
@@ -63,7 +63,7 @@ public class DefaultContactRepository implements ContactRepository {
 
     @Override
     @SuppressWarnings("Recycle")
-    public LazyCursorIterator<Contact> getContacts() {
+    public CursorIterator<Contact> getContacts() {
         LOGGER.info("Getting all contacts");
 
         final String SELECTION = HAS_PHONE_NUMBER + " = ?";
@@ -89,7 +89,7 @@ public class DefaultContactRepository implements ContactRepository {
 
         try(Cursor c = repository.query(CONTENT_URI, DEFAULT_PROJECTION, SELECTION, FILTER, null)){
             if(c.moveToFirst()){
-                return parseContact(c);
+                return contactFromCursor(c);
             }
         }
 
@@ -100,7 +100,7 @@ public class DefaultContactRepository implements ContactRepository {
 
     @Override
     @SuppressWarnings("Recycle")
-    public LazyCursorIterator<Contact> getContactByName(String desc) {
+    public CursorIterator<Contact> getContactByName(String desc) {
         final String SELECTION = DISPLAY_NAME_PRIMARY + " LIKE ?";
         final String[] FILTER = new String[]{ "%" + desc + "%" };
 
@@ -112,11 +112,18 @@ public class DefaultContactRepository implements ContactRepository {
     public Contact getContactByPhone(String phone) {
         LOGGER.info("Looking contact with phone {}", phone);
 
-        Uri LOOKUP_URI = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phone));
+        String phoneParam;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+            phoneParam = PhoneNumberUtils.formatNumberToE164(phone, ISO_2_COUNTRY_CODE);
+        }else{
+            phoneParam = phone;
+        }
+
+        Uri LOOKUP_URI = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneParam));
         try (Cursor c = repository.query(LOOKUP_URI, PHONE_LK_DEFAULT_PROJECTION, null, null, null)){
             if(c != null){
                 if(c.moveToFirst()){
-                    return parseContact(c);
+                    return contactFromCursor(c);
                 }else{
                     LOGGER.warn("Unable to move to the first row");
                 }
@@ -125,7 +132,7 @@ public class DefaultContactRepository implements ContactRepository {
             }
         }
 
-        return null;
+        return new Contact(phone.hashCode(), phone, phone);
     }
 
     @Override
@@ -154,12 +161,12 @@ public class DefaultContactRepository implements ContactRepository {
      * @param c
      * @return
      */
-    private Contact parseContact(Cursor c){
+    private Contact contactFromCursor(Cursor c) {
         return new Contact(
-                c.getLong(ID_IDX),
-                c.getString(DISPLAY_NAME_IDX),
-                c.getString(NORMALIZED_NUMBER_IDX),
-                getPhoto(c.getLong(ID_IDX))
+            c.getLong(ID_IDX),
+            c.getString(DISPLAY_NAME_IDX),
+            c.getString(NORMALIZED_NUMBER_IDX),
+            getPhoto(c.getLong(ID_IDX))
         );
     }
 
@@ -173,7 +180,7 @@ public class DefaultContactRepository implements ContactRepository {
     private byte[] getPhoto(long contactId){
         Uri contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId);
 
-        try(InputStream in = ContactsContract.Contacts.openContactPhotoInputStream(repository, contactUri)){
+        try(InputStream in = ContactsContract.Contacts.openContactPhotoInputStream(repository, contactUri, true)){
             if(in != null) {
                 try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                     final byte[] buffer = new byte[4096];
@@ -193,15 +200,15 @@ public class DefaultContactRepository implements ContactRepository {
     /**
      * Contact's provider lazy iterator
      */
-    private class ContactIterator extends LazyCursorIterator<Contact>{
+    private class ContactIterator extends CursorIterator<Contact> {
 
         public ContactIterator(Cursor cursor, boolean reset) {
             super(cursor, reset);
         }
 
         @Override
-        protected Contact handleEntity(Cursor c) {
-            return parseContact(c);
+        protected Contact fillFromCursor(Cursor c) {
+            return contactFromCursor(c);
         }
     }
 }

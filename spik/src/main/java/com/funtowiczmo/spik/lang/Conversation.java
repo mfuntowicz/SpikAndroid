@@ -1,32 +1,41 @@
 package com.funtowiczmo.spik.lang;
 
-import java.util.Collection;
-import java.util.List;
+import android.content.Context;
+import com.funtowiczmo.spik.utils.CursorIterator;
+
 
 /**
  * Created by momo- on 25/11/2015.
  */
-public class Conversation {
+public interface Conversation {
 
-    private long id;
-    private Collection<Contact> participants;
-    private List<Message> messages;
+    /**
+     * Conversation's id
+     * @return
+     */
+    long id();
 
-    public Conversation(long threadId, List<Contact> contacts, List<Message> messages) {
-        this.id = threadId;
-        this.participants = contacts;
-        this.messages = messages;
-    }
+    /**
+     * Creation date of this conversation
+     * @return
+     */
+    long date();
 
-    public long id() {
-        return id;
-    }
+    /**
+     * Id of the recipients of the conversation
+     * @return
+     */
+    String[] participants();
 
-    public Collection<Contact> participants() {
-        return participants;
-    }
+    /**
+     * Number of messages
+     * @return
+     */
+    int messagesCount();
 
-    public List<Message> messages() {
-        return messages;
-    }
+    /**
+     * Iterate through messages
+     * @return
+     */
+    CursorIterator<Message> messages(Context context);
 }

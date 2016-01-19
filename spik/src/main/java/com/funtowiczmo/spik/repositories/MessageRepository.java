@@ -1,28 +1,41 @@
 package com.funtowiczmo.spik.repositories;
 
-import com.funtowiczmo.spik.lang.Contact;
 import com.funtowiczmo.spik.lang.Conversation;
-import com.funtowiczmo.spik.lang.Message;
-import com.funtowiczmo.spik.utils.LazyCursorIterator;
-
-import java.util.Collection;
+import com.funtowiczmo.spik.lang.ThreadedMessage;
+import com.funtowiczmo.spik.repositories.observers.MessageObserver;
 
 /**
  * Created by momo- on 27/10/2015.
  */
 public interface MessageRepository {
+
+    /**
+     * Look for the message with specified id
+     * @param id
+     * @return
+     */
+    ThreadedMessage getSmsById(long id) throws Exception;
+
+    /**
+     * Retrieve the last message's id in the repository
+     *
+     * @return
+     */
+    long getLastReceivedMessageId() throws Exception;
+
+
     /**
      * Return all the conversations
      * @return
      */
-    LazyCursorIterator<Conversation> getConversations();
+    Iterable<? extends Conversation> getConversations();
 
     /**
      * Try to find a conversation according to his id
      * @param id Conversation's id
      * @return
      */
-    Conversation getConversationById(long id);
+    Conversation getConversationById(long id) throws Exception;
 
     /**
      * Try to find a conversation in which all the contact are taking part
@@ -31,4 +44,11 @@ public interface MessageRepository {
      * @return
 
     Conversation getConversationByContact(long[] ids, boolean create);*/
+
+    /**
+     * Register an observer to this MessageRepository
+     *
+     * @param observer
+     */
+    void registerObserver(MessageObserver observer);
 }
