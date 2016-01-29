@@ -15,6 +15,13 @@ public interface Conversation {
      */
     long id();
 
+
+    /**
+     * Return the id use by Spik to identify this conversation
+     * @return
+     */
+    long spikId();
+
     /**
      * Creation date of this conversation
      * @return

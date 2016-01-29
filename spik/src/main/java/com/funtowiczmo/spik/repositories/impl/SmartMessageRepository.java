@@ -20,6 +20,7 @@ import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -129,13 +130,28 @@ public class SmartMessageRepository implements MessageRepository {
     @Override
     public ThreadedMessage getSmsById(long id) throws Exception {
         LOGGER.trace("Trying to get SMS with id : {}", id);
-            try (Cursor c = context.getContentResolver().query(Telephony.Sms.Inbox.CONTENT_URI,
-                    new String[]{Telephony.Sms._ID, Telephony.Sms.DATE, Telephony.Sms.BODY, Telephony.Sms.READ, Telephony.Sms.TYPE, Telephony.Sms.THREAD_ID },
-                    Telephony.Sms._ID+ " = ?",new String[]{String.valueOf(id)}, null)) {
+        try (Cursor c = context.getContentResolver().query(Telephony.Sms.Inbox.CONTENT_URI,
+                new String[]{Telephony.Sms._ID, Telephony.Sms.DATE, Telephony.Sms.BODY, Telephony.Sms.READ, Telephony.Sms.TYPE, Telephony.Sms.THREAD_ID },
+                Telephony.Sms._ID+ " = ?", new String[]{String.valueOf(id)}, null)) {
+
             if (c.moveToFirst()) {
                 long thread = c.getLong(c.getColumnIndex(Telephony.Sms.THREAD_ID));
-                Message msg = fillSmsFromCursor(c);
-                return new ThreadedMessage(thread, msg);
+                Conversation conversation = getConversationById(thread);
+
+                if(conversation != null){
+                    Message msg = fillSmsFromCursor(c);
+                    long threadId;
+
+                    if(conversation instanceof CachedConversation) {
+                        threadId = conversation.spikId();
+                    }else{
+                        threadId = Arrays.hashCode(conversation.participants());
+                    }
+
+                    return new ThreadedMessage(threadId, msg);
+                }else{
+                    throw new Exception("Unable to find Conversation with id " + id);
+                }
             }
         }
         throw new Exception("Unable to find SMS with id " + id);
@@ -327,6 +343,7 @@ public class SmartMessageRepository implements MessageRepository {
     private  class CachedConversation implements Conversation {
 
         private long id;
+        private long spikId;
         private long date;
         private int messagesCount;
         private String[] recipients;
@@ -339,6 +356,9 @@ public class SmartMessageRepository implements MessageRepository {
         public long id() {
             return id;
         }
+
+        @Override
+        public long spikId(){ return spikId; }
 
         @Override
         public long date() {
@@ -376,7 +396,6 @@ public class SmartMessageRepository implements MessageRepository {
                             return fillMmsFromCursor(c);
                         else
                             LOGGER.trace(REPO_MARKER, "MMS Content-Type not supported {}", contentType);
-
                     }else{
                         LOGGER.warn(REPO_MARKER, "Unable to deserialize message with type {}", type);
                     }
@@ -396,6 +415,7 @@ public class SmartMessageRepository implements MessageRepository {
             }
 
             id = c.getLong(THREADS_ID);
+            spikId = Arrays.hashCode(addresses);
             date = c.getLong(THREADS_DATE);
             messagesCount = c.getInt(THREADS_MESSAGE_COUNT);
             recipients = addresses;
