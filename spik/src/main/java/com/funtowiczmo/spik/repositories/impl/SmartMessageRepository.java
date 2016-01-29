@@ -381,7 +381,7 @@ public class SmartMessageRepository implements MessageRepository {
 
             //Retrieve only SMS
             //TODO : Retrieve MMS
-            final Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, null);
+            final Cursor c = context.getContentResolver().query(MESSAGES_URI, ALL_SMS_MMS_PROJECTION, null, null, Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 150");
             return new CursorIterator<Message>(c, true){
 
                 @Override
