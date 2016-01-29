@@ -255,7 +255,7 @@ public abstract class AbstractSpikService extends RoboService {
      */
     private void sendConversation(Conversation c) {
 
-        SpikMessages.Conversation.Builder msg = SpikMessages.Conversation.newBuilder().setId(c.id());
+        SpikMessages.Conversation.Builder msg = SpikMessages.Conversation.newBuilder().setId(c.spikId());
 
         for (String recipient : c.participants()) {
             Contact contact = spikContext.contactRepository().getContactByPhone(recipient);
@@ -273,10 +273,10 @@ public abstract class AbstractSpikService extends RoboService {
                             .setRead(message.isRead())
                             .setText(message.text())
                             .setStatus(
-                                    message.state() == Message.State.RECEIVED ?
-                                            SpikMessages.Status.READ :
-                                            message.state() == Message.State.SENT ?
-                                                    SpikMessages.Status.SENT : SpikMessages.Status.SENDING
+                                message.state() == Message.State.RECEIVED ?
+                                    SpikMessages.Status.READ :
+                                        message.state() == Message.State.SENT ?
+                                        SpikMessages.Status.SENT : SpikMessages.Status.SENDING
                             )
                     );
                 }
