@@ -30,28 +30,25 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class SmartMessageRepository implements MessageRepository {
 
+    /**
+     * Threads related constants
+     **/
+    public static final Uri ALL_THREADS_URI =
+            Telephony.Threads.CONTENT_URI.buildUpon().appendQueryParameter("simple", "true").build();
+    public static final String[] ALL_THREADS_PROJECTION = {
+            Telephony.Threads._ID,
+            Telephony.Threads.DATE,
+            Telephony.Threads.MESSAGE_COUNT,
+            Telephony.Threads.RECIPIENT_IDS,
+    };
     private static final Logger LOGGER = LoggerFactory.getLogger(SmartMessageRepository.class);
     private static final Marker CACHE_MARKER = MarkerFactory.getMarker("[Recipients Cache]");
     private static final Marker REPO_MARKER = MarkerFactory.getMarker("[Repository]");
-
     /** Cache related constants **/
     private static final Uri RECIPIENTS_CANONICAL_URI =
             Telephony.MmsSms.CONTENT_URI.buildUpon().appendPath("canonical-addresses").build();
-
     private static final int CANONICAL_ID_IDX       = 0;
     private static final int CANONICAL_NUMBER_IDX   = 1;
-
-    /** Threads related constants **/
-    public static final Uri ALL_THREADS_URI =
-            Telephony.Threads.CONTENT_URI.buildUpon().appendQueryParameter("simple", "true").build();
-
-    public static final String[] ALL_THREADS_PROJECTION = {
-        Telephony.Threads._ID,
-        Telephony.Threads.DATE,
-        Telephony.Threads.MESSAGE_COUNT,
-        Telephony.Threads.RECIPIENT_IDS,
-    };
-
     private static final int THREADS_ID             = 0;
     private static final int THREADS_DATE           = 1;
     private static final int THREADS_MESSAGE_COUNT  = 2;
@@ -90,12 +87,14 @@ public class SmartMessageRepository implements MessageRepository {
     private Context context;
     private ConcurrentMap<Long, String> recipientsCache;
     private ConcurrentMap<Long, CachedConversation> threadsCache;
+    private ConcurrentMap<Long, CachedConversation> threadsSpikCache;
 
     @Inject
     public SmartMessageRepository(Context context) {
         this.context = context;
         this.recipientsCache = new ConcurrentHashMap<>();
         this.threadsCache = new ConcurrentHashMap<>();
+        this.threadsSpikCache = new ConcurrentHashMap<>();
 
 
         //Listen for modification in RECIPIENTS_CANONICAL_URI DatabaseALL_SMS_MMS_PROJECTION
@@ -193,6 +192,25 @@ public class SmartMessageRepository implements MessageRepository {
     }
 
     @Override
+    public Conversation getConversationBySpikId(long id) throws Exception {
+        if (LOGGER.isDebugEnabled())
+            LOGGER.debug(REPO_MARKER, "Trying to get conversation with SpikID {}", id);
+
+        //If we don't find in cache, invalidate it
+        if (!threadsSpikCache.containsKey(id)) {
+            LOGGER.trace(REPO_MARKER, "Conversation spikId={} not find in cache, reloading", id);
+            invalidateThreadsCache();
+
+            if (!threadsSpikCache.containsKey(id)) {
+                LOGGER.warn(REPO_MARKER, "Conversation spikId={} not find in cache after reload", id);
+                throw new Exception("Unknown conversation " + id);
+            }
+        }
+
+        return threadsCache.get(id);
+    }
+
+    @Override
     public void registerObserver(MessageObserver observer) {
         context.getContentResolver().registerContentObserver(observer.target(), false, observer);
     }
@@ -234,6 +252,7 @@ public class SmartMessageRepository implements MessageRepository {
                     if(conv == null) {
                         conv = new CachedConversation(c);
                         threadsCache.put(threadId, conv);
+                        threadsSpikCache.put(conv.spikId, conv);
                     }else {
                         conv.fillFromCursor(c);
                     }

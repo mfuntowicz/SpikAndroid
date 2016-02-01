@@ -27,6 +27,8 @@ import roboguice.service.RoboService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -52,15 +54,16 @@ public abstract class AbstractSpikService extends RoboService {
      **/
     @Inject
     private NotificationManager notificationManager;
-
     private SmsManager smsManager = SmsManager.getDefault();
 
     private SpiKServiceBinder binder = new SpiKServiceBinder();
-
     private RemoteComputer computer;
 
     @Inject
     private SpikContext spikContext;
+
+    //Contains ids of conversations already sent to the remote
+    private Set<Long> knownConversation = new HashSet<>();
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -186,16 +189,18 @@ public abstract class AbstractSpikService extends RoboService {
 
     private void sendConversations() {
         for (Conversation c : spikContext.messageRepository().getConversations()) {
-            for (String address : c.participants()) {
+            if (knownConversation.add(c.spikId())) {
+                for (String address : c.participants()) {
 
-                Contact contact = spikContext.contactRepository().getContactByPhone(address);
-                if(contact != null)
-                    sendContact(contact);
-                else
-                    LOGGER.warn("Repository returned null contact with phone {}", address);
+                    Contact contact = spikContext.contactRepository().getContactByPhone(address);
+                    if (contact != null)
+                        sendContact(contact);
+                    else
+                        LOGGER.warn("Repository returned null contact with phone {}", address);
+                }
+
+                sendConversation(c);
             }
-
-            sendConversation(c);
         }
     }
 
@@ -395,14 +400,26 @@ public abstract class AbstractSpikService extends RoboService {
         protected void onMessage(ThreadedMessage tm) {
             LOGGER.info("Received message {}", tm);
 
-            SpikMessages.Sms.Builder sms = SpikMessages.Sms.newBuilder()
-                    .setDate(tm.message().id())
-                    .setRead(tm.message().isRead())
-                    .setStatus(SpikMessages.Status.NOT_READ)
-                    .setText(tm.message().text())
-                    .setThreadId(tm.thread());
+            //If the conversation is unknown send all the conversation
+            if (knownConversation.add(tm.thread())) {
+                try {
+                    LOGGER.info("Conversation {} was not in the cache, send it to desktop", tm.thread());
 
-            lowSend(SpikMessages.Wrapper.newBuilder().setSms(sms));
+                    Conversation conversation = spikContext.messageRepository().getConversationBySpikId(tm.thread());
+                    sendConversation(conversation);
+                } catch (Exception e) {
+                    LOGGER.warn("Unable to send conversation with id {}", tm.thread());
+                }
+            } else { //Else send only the new message
+                SpikMessages.Sms.Builder sms = SpikMessages.Sms.newBuilder()
+                        .setDate(tm.message().id())
+                        .setRead(tm.message().isRead())
+                        .setStatus(SpikMessages.Status.NOT_READ)
+                        .setText(tm.message().text())
+                        .setThreadId(tm.thread());
+
+                lowSend(SpikMessages.Wrapper.newBuilder().setSms(sms));
+            }
         }
     }
 }

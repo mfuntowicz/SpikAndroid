@@ -38,6 +38,14 @@ public interface MessageRepository {
     Conversation getConversationById(long id) throws Exception;
 
     /**
+     * Try to find a conversation according to his spikId
+     *
+     * @param id Conversation's id
+     * @return
+     */
+    Conversation getConversationBySpikId(long id) throws Exception;
+
+    /**
      * Try to find a conversation in which all the contact are taking part
      * @param ids Contacts' id
      * @param create True if we need to create the conversation if not found, false otherwise
