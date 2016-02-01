@@ -157,6 +157,7 @@ public abstract class AbstractSpikService extends RoboService {
                 @Override
                 public void run() {
                     sendConversations();
+                    sendContacts();
                 }
             }, "SpikService Initialization Thread").start();
         }
@@ -195,6 +196,18 @@ public abstract class AbstractSpikService extends RoboService {
             }
 
             sendConversation(c);
+        }
+    }
+
+    private void sendContacts() {
+        CursorIterator<Contact> it = spikContext.contactRepository().getContacts();
+
+        while (it.hasNext()) {
+            Contact contact = it.next();
+            if (contact != null)
+                sendContact(contact);
+            else
+                LOGGER.warn("Repository returned null contact");
         }
     }
 

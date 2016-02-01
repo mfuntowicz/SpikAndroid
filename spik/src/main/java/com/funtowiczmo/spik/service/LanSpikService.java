@@ -35,17 +35,6 @@ public class LanSpikService extends AbstractSpikService  {
 
     private LanComputer computer;
 
-    public static Intent fillIntent(Intent i, String name, String os, String version, String ip, int port) throws IllegalArgumentException {
-
-        i.putExtra(LanSpikService.COMPUTER_NAME_EXTRA, name);
-        i.putExtra(LanSpikService.COMPUTER_OS_EXTRA, os);
-        i.putExtra(LanSpikService.COMPUTER_OS_VERSION_EXTRA, version);
-        i.putExtra(LanSpikService.COMPUTER_IP_EXTRA, ip);
-        i.putExtra(LanSpikService.COMPUTER_PORT_EXTRA, port);
-
-        return i;
-    }
-
     public LanSpikService() {
         client = new LanSmsClient(new LanSmsHandler() {
             @Override
@@ -86,6 +75,17 @@ public class LanSpikService extends AbstractSpikService  {
         });
     }
 
+    public static Intent fillIntent(Intent i, String name, String os, String version, String ip, int port) throws IllegalArgumentException {
+
+        i.putExtra(LanSpikService.COMPUTER_NAME_EXTRA, name);
+        i.putExtra(LanSpikService.COMPUTER_OS_EXTRA, os);
+        i.putExtra(LanSpikService.COMPUTER_OS_VERSION_EXTRA, version);
+        i.putExtra(LanSpikService.COMPUTER_IP_EXTRA, ip);
+        i.putExtra(LanSpikService.COMPUTER_PORT_EXTRA, port);
+
+        return i;
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
@@ -115,11 +115,11 @@ public class LanSpikService extends AbstractSpikService  {
     @Override
     protected RemoteComputer initService(Intent intent) {
         computer =  new LanComputer(
-            intent.getStringExtra(COMPUTER_NAME_EXTRA),
-            intent.getStringExtra(COMPUTER_OS_EXTRA),
-            intent.getStringExtra(COMPUTER_OS_VERSION_EXTRA),
-            intent.getStringExtra(COMPUTER_IP_EXTRA),
-            intent.getIntExtra(COMPUTER_PORT_EXTRA, 0)
+                intent.getStringExtra(COMPUTER_NAME_EXTRA),
+                intent.getStringExtra(COMPUTER_OS_EXTRA),
+                intent.getStringExtra(COMPUTER_OS_VERSION_EXTRA),
+                intent.getStringExtra(COMPUTER_IP_EXTRA),
+                intent.getIntExtra(COMPUTER_PORT_EXTRA, 0)
         );
 
         return computer;

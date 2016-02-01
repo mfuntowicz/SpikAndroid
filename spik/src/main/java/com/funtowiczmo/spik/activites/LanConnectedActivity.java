@@ -9,7 +9,6 @@ import com.funtowiczmo.spik.service.LanSpikService;
  */
 public class LanConnectedActivity extends ConnectedActivity {
 
-
     private SpikServiceConnection connection;
 
     @Override
@@ -20,7 +19,6 @@ public class LanConnectedActivity extends ConnectedActivity {
         intent.putExtras(getIntent().getExtras());
 
         connection = new SpikServiceConnection();
-
         bindSpikService(intent, connection);
     }
 

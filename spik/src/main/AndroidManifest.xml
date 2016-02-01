@@ -29,12 +29,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".activites.LanConnectedActivity"/>
+
         <service android:name=".service.LanSpikService" />
 
-        <activity
-                android:name=".activites.LanConnectedActivity"
-                android:label="@string/connexion_information_label">
-        </activity>
     </application>
 
 </manifest>
